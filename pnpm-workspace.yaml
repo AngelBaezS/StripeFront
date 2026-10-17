@@ -1,0 +1,10 @@
+allowBuilds:
+  '@parcel/watcher': false
+  esbuild: false
+  lmdb: false
+  msgpackr-extract: false
+  nx: false
+minimumReleaseAgeExclude:
+  - '@spartan-ng/brain@1.6.3'
+patchedDependencies:
+  tw-animate-css: patches/tw-animate-css.patch
