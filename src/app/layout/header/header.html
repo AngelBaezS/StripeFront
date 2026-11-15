@@ -1,0 +1,125 @@
+<header
+  class="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+  <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <!-- Logo & Inicio -->
+    <div class="flex items-center gap-6">
+      <a [routerLink]="homeRoute()" class="flex items-center gap-2 font-bold text-lg tracking-tight text-foreground">
+        <span class="flex size-9 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+          <ng-icon name="lucideShoppingBag" class="text-lg" />
+        </span>
+        <span>StripeStore</span>
+      </a>
+
+      <nav class="hidden md:flex items-center gap-2">
+        <a *appHasRole="'CLIENT'" hlmBtn variant="ghost" size="sm" routerLink="/products"
+          routerLinkActive="bg-muted text-foreground" [routerLinkActiveOptions]="{ exact: true }">
+          <ng-icon name="lucideHome" />
+          <span>Inicio</span>
+        </a>
+
+        <a *appHasRole="'CLIENT'" hlmBtn variant="ghost" size="sm" routerLink="/orders"
+          routerLinkActive="bg-muted text-foreground">
+          <ng-icon name="lucidePackage" />
+          <span>Mis Pedidos</span>
+        </a>
+
+        <a *appHasRole="'ADMIN'" hlmBtn variant="ghost" size="sm" routerLink="/admin/products"
+          routerLinkActive="bg-muted text-foreground" [routerLinkActiveOptions]="{ exact: true }">
+          <ng-icon name="lucidePackage" />
+          <span>Catálogo Admin</span>
+        </a>
+      </nav>
+    </div>
+
+    <!-- Acciones Derecha: Carrito y Perfil -->
+    <div class="flex items-center gap-3">
+      <!-- Botón Ver Carrito (solo clientes) -->
+      <a *appHasRole="'CLIENT'" hlmBtn variant="outline" size="default" routerLink="/cart"
+        class="relative flex items-center gap-2">
+        <ng-icon name="lucideShoppingCart" />
+        <span class="hidden sm:inline">Carrito</span>
+        @if (cartService.totalItems() > 0) {
+        <span hlmBadge variant="default" class="ml-0.5 px-1.5 py-0 text-xs">
+          {{ cartService.totalItems() }}
+        </span>
+        }
+      </a>
+
+      <!-- Menú de Perfil con Spartan Dropdown Menu -->
+      <button hlmBtn variant="ghost" size="sm" [hlmDropdownMenuTrigger]="profileMenu" align="end"
+        class="flex items-center gap-2 px-2">
+        <hlm-avatar size="sm">
+          <span hlmAvatarFallback class="bg-primary/10 text-primary font-semibold">
+            {{ userInitials() }}
+          </span>
+        </hlm-avatar>
+        <span class="hidden sm:inline text-sm font-medium">
+          {{ authService.currentUsername() }}
+        </span>
+      </button>
+
+      <ng-template #profileMenu>
+        <hlm-dropdown-menu class="w-56">
+          <hlm-dropdown-menu-label class="font-normal">
+            <div class="flex flex-col space-y-1">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-sm font-semibold leading-none text-foreground">
+                  {{ authService.currentUsername() }}
+                </p>
+                @if (authService.currentRole(); as role) {
+                <span hlmBadge [variant]="role === 'ADMIN' ? 'default' : 'secondary'" class="text-[10px] px-1.5 py-0">
+                  {{ role }}
+                </span>
+                }
+              </div>
+              <p class="text-xs leading-none text-muted-foreground truncate">
+                {{ authService.currentProfile()?.email || 'Cuenta activa' }}
+              </p>
+            </div>
+          </hlm-dropdown-menu-label>
+
+          <hlm-dropdown-menu-separator />
+
+          <hlm-dropdown-menu-group>
+            <button hlmDropdownMenuItem (triggered)="onViewProfile()">
+              <ng-icon name="lucideUser" />
+              <span>Mi Perfil</span>
+            </button>
+
+            <a *appHasRole="'CLIENT'" hlmDropdownMenuItem routerLink="/products">
+              <ng-icon name="lucideHome" />
+              <span>Ir al Inicio</span>
+            </a>
+
+            <a *appHasRole="'ADMIN'" hlmDropdownMenuItem routerLink="/admin/products">
+              <ng-icon name="lucidePackage" />
+              <span>Gestionar Catálogo</span>
+            </a>
+
+            <a *appHasRole="'ADMIN'" hlmDropdownMenuItem routerLink="/admin/products/new">
+              <ng-icon name="lucidePlusCircle" />
+              <span>Agregar Producto</span>
+            </a>
+
+            <a *appHasRole="'CLIENT'" hlmDropdownMenuItem routerLink="/orders">
+              <ng-icon name="lucidePackage" />
+              <span>Mis Pedidos</span>
+            </a>
+
+            <button *appHasRole="'CLIENT'" hlmDropdownMenuItem (triggered)="onGoToCart()">
+              <ng-icon name="lucideShoppingCart" />
+              <span>Ver Carrito ({{ cartService.totalItems() }})</span>
+            </button>
+          </hlm-dropdown-menu-group>
+
+          <hlm-dropdown-menu-separator />
+
+          <button hlmDropdownMenuItem variant="destructive" (triggered)="onLogout()">
+            <ng-icon name="lucideLogOut" />
+            <span>Cerrar Sesión</span>
+          </button>
+        </hlm-dropdown-menu>
+      </ng-template>
+    </div>
+  </div>
+</header>

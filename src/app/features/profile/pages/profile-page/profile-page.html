@@ -1,0 +1,176 @@
+<section class="mx-auto max-w-5xl space-y-6">
+  <!-- Cabecera -->
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div class="space-y-1">
+      <div class="flex items-center gap-2.5">
+        <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          Mi Perfil
+        </h1>
+      </div>
+      <p class="text-sm text-muted-foreground">
+        Consulta los detalles de tu cuenta y actualiza tu nombre de usuario o contraseña.
+      </p>
+    </div>
+
+    <a hlmBtn variant="outline" size="sm" [routerLink]="backRoute()" class="w-fit gap-2">
+      <ng-icon name="lucideArrowLeft" />
+      <span>Volver</span>
+    </a>
+  </div>
+
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <!-- Detalles del Perfil -->
+    <div hlmCard class="border border-border shadow-sm lg:col-span-1 h-fit">
+      <div hlmCardHeader class="items-center text-center pb-4">
+        <h2 hlmCardTitle class="text-xl font-bold">
+          {{ authService.currentProfile()?.username || authService.currentUsername() }}
+        </h2>
+        <p hlmCardDescription class="text-xs font-mono">
+          {{ authService.currentProfile()?.id || 'Cuenta verificada' }}
+        </p>
+      </div>
+
+      <hlm-separator />
+
+      <div hlmCardContent class="pt-4 space-y-4 text-sm">
+
+        <div class="flex items-start gap-3">
+          <ng-icon name="lucideMail" class="text-muted-foreground mt-0.5 shrink-0" />
+          <div class="min-w-0">
+            <span class="text-xs text-muted-foreground block">Correo electrónico</span>
+            <span class="font-medium text-foreground break-all">
+              {{ authService.currentProfile()?.email || 'Cargando...' }}
+            </span>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-3">
+          <ng-icon name="lucidePhone" class="text-muted-foreground mt-0.5 shrink-0" />
+          <div class="min-w-0">
+            <span class="text-xs text-muted-foreground block">Teléfono</span>
+            <span class="font-medium text-foreground">
+              {{ authService.currentProfile()?.phone || 'Sin teléfono registrado' }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Formularios de actualización -->
+    <div class="space-y-6 lg:col-span-2">
+      <!-- Cambiar Username -->
+      <div hlmCard class="border border-border shadow-sm">
+        <div hlmCardHeader>
+          <h2 hlmCardTitle class="flex items-center gap-2 text-lg font-semibold">
+            <ng-icon name="lucideUser" class="text-lg text-primary" />
+            <span>Cambiar Nombre de Usuario</span>
+          </h2>
+          <p hlmCardDescription>
+            Actualiza el identificador con el que inicias sesión. Tu sesión se mantendrá activa automáticamente.
+          </p>
+        </div>
+
+        <div hlmCardContent>
+          <form [formGroup]="usernameForm" (ngSubmit)="onUpdateUsername()" class="space-y-4">
+            @if (usernameError()) {
+            <div hlmAlert variant="destructive">
+              <p hlmAlertDescription>{{ usernameError() }}</p>
+            </div>
+            }
+
+            <div hlmField class="space-y-1.5">
+              <label hlmFieldLabel for="profile-username">Nombre de usuario</label>
+              <input hlmInput id="profile-username" type="text" formControlName="username"
+                placeholder="Mínimo 3 caracteres" autocomplete="username" />
+              @if (isFieldInvalid(usernameForm, 'username')) {
+              <hlm-field-error>
+                El nombre de usuario es requerido (entre 3 y 50 caracteres).
+              </hlm-field-error>
+              }
+            </div>
+
+            <div class="flex justify-end">
+              <button hlmBtn type="submit" [disabled]="isSavingUsername() || isLoadingProfile()" class="gap-2">
+                @if (isSavingUsername()) {
+                <hlm-spinner class="mr-1" />
+                <span>Guardando...</span>
+                } @else {
+                <ng-icon name="lucideSave" />
+                <span>Guardar Usuario</span>
+                }
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Cambiar Contraseña -->
+      <div hlmCard class="border border-border shadow-sm">
+        <div hlmCardHeader>
+          <h2 hlmCardTitle class="flex items-center gap-2 text-lg font-semibold">
+            <ng-icon name="lucideKeyRound" class="text-lg text-primary" />
+            <span>Cambiar Contraseña</span>
+          </h2>
+          <p hlmCardDescription>
+            Por seguridad, ingresa tu contraseña actual antes de definir una nueva.
+          </p>
+        </div>
+
+        <div hlmCardContent>
+          <form [formGroup]="passwordForm" (ngSubmit)="onUpdatePassword()" class="space-y-4">
+            @if (passwordError()) {
+            <div hlmAlert variant="destructive">
+              <p hlmAlertDescription>{{ passwordError() }}</p>
+            </div>
+            }
+
+            <div hlmField class="space-y-1.5">
+              <label hlmFieldLabel for="profile-current-password">Contraseña actual</label>
+              <input hlmInput id="profile-current-password" type="password" formControlName="currentPassword"
+                placeholder="Ingresa tu contraseña actual" autocomplete="current-password" />
+              @if (isFieldInvalid(passwordForm, 'currentPassword')) {
+              <hlm-field-error>La contraseña actual es requerida.</hlm-field-error>
+              }
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div hlmField class="space-y-1.5">
+                <label hlmFieldLabel for="profile-new-password">Nueva contraseña</label>
+                <input hlmInput id="profile-new-password" type="password" formControlName="newPassword"
+                  placeholder="Mínimo 6 caracteres" autocomplete="new-password" />
+                @if (isFieldInvalid(passwordForm, 'newPassword')) {
+                <hlm-field-error>
+                  La nueva contraseña debe tener al menos 6 caracteres.
+                </hlm-field-error>
+                }
+              </div>
+
+              <div hlmField class="space-y-1.5">
+                <label hlmFieldLabel for="profile-confirm-password">Confirmar nueva contraseña</label>
+                <input hlmInput id="profile-confirm-password" type="password" formControlName="confirmPassword"
+                  placeholder="Repite la nueva contraseña" autocomplete="new-password" />
+                @if (isFieldInvalid(passwordForm, 'confirmPassword')) {
+                <hlm-field-error>Confirma la nueva contraseña.</hlm-field-error>
+                } @else if (hasPasswordMismatch()) {
+                <hlm-field-error>Las contraseñas no coinciden.</hlm-field-error>
+                }
+              </div>
+            </div>
+
+            <div class="flex justify-end">
+              <button hlmBtn type="submit" [disabled]="isSavingPassword()" class="gap-2">
+                @if (isSavingPassword()) {
+                <hlm-spinner class="mr-1" />
+                <span>Actualizando...</span>
+                } @else {
+                <ng-icon name="lucideKeyRound" />
+                <span>Actualizar Contraseña</span>
+                }
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

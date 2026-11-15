@@ -1,0 +1,92 @@
+<section class="space-y-8">
+  <!-- Encabezado y Buscador -->
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight text-foreground">Catálogo de Productos</h1>
+      <p class="text-sm text-muted-foreground mt-1">
+        Explora nuestra selección y agrega tus artículos favoritos al carrito
+      </p>
+    </div>
+
+    <!-- Barra de búsqueda con Spartan UI -->
+    <div class="relative w-full sm:w-80">
+      <ng-icon
+        name="lucideSearch"
+        class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+      />
+      <input
+        hlmInput
+        type="search"
+        placeholder="Buscar productos..."
+        [ngModel]="searchQuery()"
+        (ngModelChange)="onSearchChange($event)"
+        class="pl-9 w-full"
+      />
+    </div>
+  </div>
+
+  <!-- Alerta de Error -->
+  @if (errorMessage()) {
+    <div hlmAlert variant="destructive" class="flex items-center justify-between gap-4">
+      <p hlmAlertDescription>{{ errorMessage() }}</p>
+      <button hlmBtn variant="outline" size="sm" (click)="loadProducts()">
+        <ng-icon name="lucideRefreshCw" />
+        <span>Reintentar</span>
+      </button>
+    </div>
+  }
+
+  <!-- Estado de Carga (Skeletons de Spartan UI) -->
+  @if (isLoading()) {
+    <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      @for (item of skeletonItems; track item) {
+        <div hlmCard size="sm" class="overflow-hidden border border-border">
+          <hlm-skeleton class="aspect-4/3 w-full rounded-none" />
+          <div hlmCardHeader class="space-y-1.5">
+            <hlm-skeleton class="h-4 w-3/4" />
+            <hlm-skeleton class="h-3 w-full" />
+            <hlm-skeleton class="h-3 w-2/3" />
+          </div>
+          <div hlmCardFooter class="pt-3 flex items-center justify-between">
+            <hlm-skeleton class="h-5 w-16" />
+            <hlm-skeleton class="h-8 w-24 rounded-4xl" />
+          </div>
+        </div>
+      }
+    </div>
+  } @else if (filteredProducts().length === 0) {
+    <!-- Estado Vacío con Spartan UI Empty -->
+    <div hlmEmpty class="border border-dashed border-border my-8">
+      <div hlmEmptyHeader>
+        <div class="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground mb-2">
+          <ng-icon name="lucidePackageOpen" class="text-2xl" />
+        </div>
+        <h3 hlmEmptyTitle>No se encontraron productos</h3>
+        <p hlmEmptyDescription>
+          @if (searchQuery()) {
+            No hay coincidencias para "{{ searchQuery() }}". Intenta con otro término de búsqueda.
+          } @else {
+            Aún no hay productos disponibles en el catálogo.
+          }
+        </p>
+      </div>
+      @if (searchQuery()) {
+        <button hlmBtn variant="outline" size="sm" (click)="onSearchChange('')">
+          Limpiar búsqueda
+        </button>
+      }
+    </div>
+  } @else {
+    <!-- Grilla de Cards de Productos -->
+    <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      @for (product of filteredProducts(); track product.id) {
+        <app-product-card
+          [product]="product"
+          [isAdding]="addingProductId() === product.id"
+          (addToCart)="onAddToCart($event)"
+        />
+      }
+    </div>
+  }
+</section>
+

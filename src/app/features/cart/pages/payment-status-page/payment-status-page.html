@@ -1,0 +1,172 @@
+<div class="mx-auto max-w-lg py-12 px-4">
+  <section hlmCard class="border border-border shadow-md">
+    <div hlmCardHeader class="space-y-2">
+      <div class="flex items-center justify-between">
+        <h2 hlmCardTitle class="text-xl font-bold tracking-tight text-foreground">
+          Estado de tu Pago
+        </h2>
+      </div>
+      @if (orderId()) {
+      <p hlmCardDescription class="font-mono text-xs text-muted-foreground break-all">
+        Orden: {{ orderId() }}
+      </p>
+      }
+    </div>
+
+    <div hlmCardContent class="space-y-6 pt-2">
+      @switch (status()) {
+      @case ('succeeded') {
+      <div hlmAlert class="border-primary/20 bg-primary/5">
+        <div class="flex items-start gap-3">
+          <ng-icon name="lucideCheckCircle2" class="text-2xl shrink-0 mt-0.5 text-green-500  " />
+          <div>
+            <h4 hlmAlertTitle class="font-semibold text-foreground">¡Pago completado con éxito!</h4>
+            <p hlmAlertDescription class="text-xs text-muted-foreground mt-1 leading-relaxed">
+              Tu orden ha sido confirmada. Recibirás tu recibo en el
+              correo electrónico de tu cuenta.
+            </p>
+          </div>
+        </div>
+      </div>
+      }
+
+      @case ('processing') {
+      <div hlmAlert class="border-secondary/30 bg-muted/30">
+        <div class="flex items-start gap-3">
+          <ng-icon name="lucideClock" class="text-2xl text-blue-600 shrink-0 mt-0.5" />
+          <div>
+            <h4 hlmAlertTitle class="font-semibold text-foreground">Pago en proceso de acreditación (SPEI)</h4>
+            <p hlmAlertDescription class="text-xs text-muted-foreground mt-1 leading-relaxed">
+              Tu orden ha quedado reservada en estado PENDING durante 2 días (48 horas). En cuanto recibamos la
+              confirmación de la transferencia SPEI desde el banco, se marcará automáticamente como completada.
+            </p>
+          </div>
+        </div>
+      </div>
+      }
+
+      @case ('requires_action') {
+      <div hlmAlert class="border-secondary/30 bg-muted/30">
+        <div class="flex items-start gap-3">
+          <ng-icon name="lucideClock" class="text-2xl text-orange-500 shrink-0 mt-0.5" />
+          <div>
+            <h4 hlmAlertTitle class="font-semibold text-foreground">En espera de transferencia bancaria SPEI</h4>
+            <p hlmAlertDescription class="text-xs text-muted-foreground mt-1 leading-relaxed">
+              Tu orden está reservada en estado PENDING por 2 días (48 horas). Realiza la transferencia con los datos de
+              abajo o descarga tu ficha PDF.
+            </p>
+          </div>
+        </div>
+      </div>
+      }
+
+      @default {
+      <div hlmAlert variant="destructive">
+        <div class="flex items-start gap-3">
+          <ng-icon name="lucideAlertTriangle" class="text-2xl shrink-0 mt-0.5" />
+          <div>
+            <h4 hlmAlertTitle class="font-semibold">El pago no pudo completarse</h4>
+            <p hlmAlertDescription class="text-xs mt-1 leading-relaxed">
+              La transacción no pudo completarse o fue cancelada por la entidad emisora. Puedes volver a intentarlo o
+              elegir otro método de pago.
+            </p>
+          </div>
+        </div>
+      </div>
+      }
+      }
+
+      @if (status() === 'processing' || status() === 'requires_action') {
+      @if (isLoadingSpeiDetails()) {
+      <div
+        class="rounded-lg border border-border bg-muted/30 p-4 flex items-center gap-3 text-xs text-muted-foreground">
+        <hlm-spinner />
+        <span>Cargando instrucciones y número CLABE SPEI...</span>
+      </div>
+      } @else if (speiDetails(); as details) {
+      <div class="rounded-lg border border-primary/25 bg-primary/5 p-4 space-y-3">
+        <div class="flex items-center gap-2">
+          <ng-icon name="lucideLandmark" class="text-lg text-primary shrink-0" />
+          <h3 class="text-sm font-bold text-foreground">Datos para Transferencia SPEI</h3>
+        </div>
+
+        <div class="rounded-md border border-border bg-background p-3 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <span class="text-xs text-muted-foreground block">CLABE Interbancaria (18 dígitos)</span>
+            <span class="font-mono text-sm font-bold tracking-wider text-foreground break-all">
+              {{ details.clabe || 'Ver ficha oficial de Stripe' }}
+            </span>
+          </div>
+          @if (details.clabe) {
+          <button hlmBtn variant="outline" size="sm" type="button" (click)="copySpeiClabe(details.clabe)"
+            class="gap-1.5 shrink-0">
+            <ng-icon [name]="speiCopied() ? 'lucideCheck' : 'lucideCopy'" />
+            <span>{{ speiCopied() ? 'Copiada' : 'Copiar' }}</span>
+          </button>
+          }
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="rounded-md border border-border bg-background p-2.5">
+            <span class="text-muted-foreground block">Banco Receptor</span>
+            <span class="font-semibold text-foreground">{{ details.bankName || 'STP' }}</span>
+          </div>
+          <div class="rounded-md border border-border bg-background p-2.5">
+            <span class="text-muted-foreground block">Referencia</span>
+            <span class="font-mono font-semibold text-foreground">{{ details.reference || 'N/A' }}</span>
+          </div>
+        </div>
+
+        @if (details.amountCents) {
+        <div class="rounded-md border border-border bg-background p-2.5 flex items-center justify-between text-xs">
+          <span class="text-muted-foreground">Monto Exacto</span>
+          <span class="text-sm font-bold text-primary">
+            {{ details.amountCents | centsToCurrency: (details.currency || 'MXN').toUpperCase() }}
+          </span>
+        </div>
+        }
+      </div>
+      }
+
+      @if (orderId()) {
+      <div class="flex flex-col sm:flex-row gap-2.5">
+        <button hlmBtn type="button" [disabled]="isDownloadingSpeiPdf()" (click)="downloadSpeiPdf()"
+          class="w-full sm:flex-1 gap-2 font-semibold">
+          @if (isDownloadingSpeiPdf()) {
+          <hlm-spinner />
+          <span>Generando PDF...</span>
+          } @else {
+          <ng-icon name="lucideFileDown" />
+          <span>Descargar Ficha SPEI (PDF)</span>
+          }
+        </button>
+
+        @if (paymentUrl() || speiDetails()?.hostedInstructionsUrl; as instructionsUrl) {
+        <a hlmBtn variant="outline" [href]="instructionsUrl" target="_blank" rel="noopener noreferrer"
+          class="w-full sm:flex-1 gap-2">
+          <ng-icon name="lucideExternalLink" />
+          <span>Ver Instrucciones Stripe</span>
+        </a>
+        }
+      </div>
+      }
+      }
+
+      <div class="flex flex-col sm:flex-row items-between justify-between gap-3 pt-2">
+        @if (status() === 'processing' || status() === 'requires_action') {
+        <a hlmBtn variant="secondary" routerLink="/orders" class="w-full sm:w-auto">
+          Ver Mis Pedidos
+        </a>
+        }
+        <a hlmBtn [variant]="status() === 'succeeded' ? 'outline' : 'default'" routerLink="/products"
+          class="w-full sm:w-auto gap-2">
+          <ng-icon name="lucideShoppingBag" />
+          <span>Volver a la Tienda</span>
+        </a>
+        <a hlmBtn variant="outline" routerLink="/cart" class="w-full sm:w-auto">
+          Ir al Carrito
+        </a>
+      </div>
+    </div>
+  </section>
+</div>

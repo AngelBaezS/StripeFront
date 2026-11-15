@@ -1,0 +1,203 @@
+<section class="mx-auto max-w-6xl space-y-6">
+  <!-- Encabezado del Carrito -->
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <div class="flex items-center gap-2.5">
+        <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          Mi Carrito de Compras
+        </h1>
+        @if (cartService.totalItems() > 0) {
+          <span hlmBadge variant="default">
+            {{ cartService.totalItems() }} {{ cartService.totalItems() === 1 ? 'artículo' : 'artículos' }}
+          </span>
+        }
+      </div>
+      <p class="text-sm text-muted-foreground mt-1">
+        Revisa los productos seleccionados antes de proceder con tu pedido
+      </p>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <a hlmBtn variant="outline" size="sm" routerLink="/products" class="gap-1.5">
+        <ng-icon name="lucideArrowLeft" />
+        <span>Seguir Comprando</span>
+      </a>
+
+      @if (cartService.items().length > 0) {
+        <button
+          hlmBtn
+          type="button"
+          variant="destructive"
+          size="sm"
+          (click)="onClearCart()"
+          [disabled]="isClearing()"
+          class="gap-1.5"
+        >
+          @if (isClearing()) {
+            <hlm-spinner />
+            <span>Vaciando...</span>
+          } @else {
+            <ng-icon name="lucideTrash2" />
+            <span>Vaciar Carrito</span>
+          }
+        </button>
+      }
+    </div>
+  </div>
+
+  <!-- Alerta de Error -->
+  @if (errorMessage()) {
+    <div hlmAlert variant="destructive" class="flex items-center justify-between gap-4">
+      <p hlmAlertDescription>{{ errorMessage() }}</p>
+      <button hlmBtn variant="outline" size="sm" (click)="loadCart()">
+        <ng-icon name="lucideRefreshCw" />
+        <span>Reintentar</span>
+      </button>
+    </div>
+  }
+
+  <!-- Banner de aviso si tiene pedidos pendientes -->
+  @if (pendingOrdersCount() > 0) {
+    <div hlmAlert class="border-amber-500/30 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <ng-icon name="lucideClock" class="text-xl text-amber-600 dark:text-amber-500 shrink-0" />
+        <div>
+          <h4 hlmAlertTitle class="font-semibold text-foreground">Tienes compras pendientes de pago</h4>
+          <p hlmAlertDescription class="text-xs text-muted-foreground">
+            Cuentas con {{ pendingOrdersCount() }} {{ pendingOrdersCount() === 1 ? 'orden pendiente' : 'órdenes pendientes' }} de pago. Puedes reanudar tu pago de inmediato.
+          </p>
+        </div>
+      </div>
+
+      <a hlmBtn size="sm" routerLink="/orders" class="gap-1.5 shrink-0 w-full sm:w-auto font-medium">
+        <ng-icon name="lucidePackage" />
+        <span>Ver Mis Pedidos</span>
+      </a>
+    </div>
+  }
+
+  <!-- Estado de Carga (Skeletons) -->
+  @if (cartService.isLoading() && cartService.items().length === 0) {
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div class="lg:col-span-2 space-y-3">
+        @for (row of skeletonRows; track row) {
+          <div hlmCard size="sm" class="border border-border">
+            <div hlmCardContent class="flex items-center justify-between gap-4">
+              <div class="flex items-center gap-4 flex-1">
+                <hlm-skeleton class="size-20 rounded-2xl shrink-0" />
+                <div class="space-y-2 flex-1">
+                  <hlm-skeleton class="h-4 w-1/3" />
+                  <hlm-skeleton class="h-3 w-2/3" />
+                  <hlm-skeleton class="h-3 w-1/4" />
+                </div>
+              </div>
+              <hlm-skeleton class="h-8 w-24 rounded-2xl" />
+            </div>
+          </div>
+        }
+      </div>
+      <div>
+        <div hlmCard class="border border-border space-y-4">
+          <div hlmCardHeader>
+            <hlm-skeleton class="h-5 w-1/2" />
+          </div>
+          <div hlmCardContent class="space-y-3">
+            <hlm-skeleton class="h-4 w-full" />
+            <hlm-skeleton class="h-4 w-full" />
+            <hlm-skeleton class="h-10 w-full rounded-4xl mt-4" />
+          </div>
+        </div>
+      </div>
+    </div>
+  } @else if (cartService.items().length === 0) {
+    <!-- Estado Vacío con Spartan UI Empty -->
+    <div hlmEmpty class="border border-dashed border-border my-8">
+      <div hlmEmptyHeader>
+        <div class="flex size-14 items-center justify-center rounded-full bg-muted text-muted-foreground mb-2">
+          <ng-icon name="lucideShoppingCart" class="text-2xl" />
+        </div>
+        <h3 hlmEmptyTitle>Tu carrito está vacío</h3>
+        <p hlmEmptyDescription>
+          Aún no has agregado productos a tu carrito. Explora nuestro catálogo y añade los artículos que más te gusten.
+        </p>
+      </div>
+      <a hlmBtn routerLink="/products" class="gap-2 mt-2">
+        <ng-icon name="lucideShoppingBag" />
+        <span>Ir al Catálogo</span>
+      </a>
+    </div>
+  } @else {
+    <!-- Contenido Principal del Carrito -->
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3 items-start">
+      <!-- Lista de Productos en el Carrito (2/3) -->
+      <div class="lg:col-span-2 space-y-3">
+        @for (item of cartService.items(); track item.productId) {
+          <app-cart-item
+            [item]="item"
+            [isProcessing]="processingProductId() === item.productId"
+            (increment)="onIncrementItem($event)"
+            (decrement)="onDecrementItem($event)"
+            (remove)="onRemoveItem($event)"
+          />
+        }
+      </div>
+
+      <!-- Resumen del Carrito (1/3) -->
+      <div hlmCard class="border border-border shadow-sm sticky top-24">
+        <div hlmCardHeader>
+          <div class="flex items-center justify-between">
+            <h2 hlmCardTitle class="text-lg font-semibold">Resumen del Pedido</h2>
+            @if (cartService.cart()?.status) {
+              <span hlmBadge variant="secondary" class="text-[11px]">
+                {{ cartService.cart()?.status }}
+              </span>
+            }
+          </div>
+          <p hlmCardDescription>Detalle de los productos en tu carrito activo</p>
+        </div>
+
+        <div hlmCardContent class="space-y-4">
+          <div class="space-y-2 text-sm">
+            <div class="flex items-center justify-between text-muted-foreground">
+              <span>Total de productos</span>
+              <span class="font-medium text-foreground">{{ cartService.totalItems() }} unidades</span>
+            </div>
+
+            <div class="flex items-center justify-between text-muted-foreground">
+              <span>Subtotal</span>
+              <span class="font-medium text-foreground">
+                {{ cartService.totalAmountCents() | centsToCurrency }}
+              </span>
+            </div>
+          </div>
+
+          <hlm-separator />
+
+          <div class="flex items-center justify-between">
+            <span class="text-base font-semibold text-foreground">Total a pagar</span>
+            <span class="text-xl font-bold text-foreground">
+              {{ cartService.totalAmountCents() | centsToCurrency }}
+            </span>
+          </div>
+        </div>
+
+        <div hlmCardFooter class="flex flex-col gap-2 pt-2">
+          <a
+            hlmBtn
+            size="lg"
+            routerLink="/cart/checkout"
+            class="w-full gap-2 font-semibold shadow-sm"
+          >
+            <ng-icon name="lucideCreditCard" />
+            <span>Proceder al Pago</span>
+          </a>
+
+          <a hlmBtn variant="outline" routerLink="/products" class="w-full">
+            Agregar más productos
+          </a>
+        </div>
+      </div>
+    </div>
+  }
+</section>
+

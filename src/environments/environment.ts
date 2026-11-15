@@ -1,5 +1,5 @@
 export const environment = {
     production: true,
-    apiUrl: 'https://tu-dominio-de-produccion.com',
-    stripePublicKey: 'pk_live_TU_CLAVE_PUBLICA_PRODUCCION',
+    apiUrl: 'http://localhost:8080',
+    stripePublicKey: 'pk_test_51UOQYjBdjYWPYXgRq8hl73wzBdMMbmcKwOxHL9hgKrUaAXd1tYtCqGuQECMzbzxgFRa7e8fAVqRr4FC38LQlcEMt002kxtEvsy',
 };

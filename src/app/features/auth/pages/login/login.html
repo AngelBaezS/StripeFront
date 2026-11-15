@@ -1,0 +1,67 @@
+<div class="min-h-[85vh] flex items-center justify-center p-4">
+  <div hlmCard class="w-full max-w-md shadow-lg border border-border">
+    <div hlmCardHeader class="space-y-1">
+      <h2 hlmCardTitle class="text-2xl font-bold tracking-tight text-center">Iniciar Sesión</h2>
+      <p hlmCardDescription class="text-center text-muted-foreground">
+        Ingresa tus credenciales para acceder a tu cuenta
+      </p>
+    </div>
+
+    <div hlmCardContent>
+      <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="space-y-4">
+        @if (errorMessage()) {
+          <div hlmAlert variant="destructive">
+            <p hlmAlertDescription>{{ errorMessage() }}</p>
+          </div>
+        }
+
+        <div hlmField class="space-y-1.5">
+          <label hlmFieldLabel for="username">Usuario</label>
+          <input
+            hlmInput
+            id="username"
+            type="text"
+            formControlName="username"
+            placeholder="ej. juanperez"
+            autocomplete="username"
+          />
+          @if (isFieldInvalid('username')) {
+            <hlm-field-error>El nombre de usuario es requerido.</hlm-field-error>
+          }
+        </div>
+
+        <div hlmField class="space-y-1.5">
+          <label hlmFieldLabel for="password">Contraseña</label>
+          <input
+            hlmInput
+            id="password"
+            type="password"
+            formControlName="password"
+            placeholder="••••••••"
+            autocomplete="current-password"
+          />
+          @if (isFieldInvalid('password')) {
+            <hlm-field-error>La contraseña es requerida.</hlm-field-error>
+          }
+        </div>
+
+        <button hlmBtn type="submit" class="w-full mt-2" [disabled]="isLoading()">
+          @if (isLoading()) {
+            <hlm-spinner class="mr-2" />
+            <span>Iniciando sesión...</span>
+          } @else {
+            <span>Entrar</span>
+          }
+        </button>
+      </form>
+    </div>
+
+    <div hlmCardFooter class="flex justify-center border-t border-border/50 pt-4 text-sm text-muted-foreground">
+      <span>¿No tienes una cuenta?</span>
+      <a routerLink="/auth/register" class="ml-1 font-medium text-primary hover:underline">
+        Regístrate aquí
+      </a>
+    </div>
+  </div>
+</div>
+

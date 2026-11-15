@@ -1,0 +1,211 @@
+<section class="space-y-6">
+  <!-- Cabecera de la sección -->
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <div class="flex items-center gap-2.5">
+        <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          Administración de Catálogo
+        </h1>
+        <span hlmBadge variant="default" class="text-xs">
+          {{ filteredProducts().length }} {{ filteredProducts().length === 1 ? 'producto' : 'productos' }}
+        </span>
+      </div>
+      <p class="text-sm text-muted-foreground mt-1">
+        Consulta el inventario completo, identificadores sincronizados con Stripe y modifica precios
+      </p>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <a hlmBtn size="default" routerLink="/admin/products/new" class="gap-2">
+        <ng-icon name="lucidePlus" />
+        <span>Nuevo Producto</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Barra de Filtro / Búsqueda -->
+  <div class="flex items-center justify-between gap-4">
+    <div class="relative w-full max-w-sm">
+      <ng-icon
+        name="lucideSearch"
+        class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+      />
+      <input
+        hlmInput
+        type="search"
+        placeholder="Buscar por nombre, ID o Stripe ID..."
+        [ngModel]="searchQuery()"
+        (ngModelChange)="onSearchChange($event)"
+        class="pl-9 w-full"
+      />
+    </div>
+
+    @if (searchQuery()) {
+      <button hlmBtn variant="ghost" size="sm" (click)="onSearchChange('')">
+        Limpiar filtro
+      </button>
+    }
+  </div>
+
+  <!-- Alerta de Error -->
+  @if (errorMessage()) {
+    <div hlmAlert variant="destructive" class="flex items-center justify-between gap-4">
+      <p hlmAlertDescription>{{ errorMessage() }}</p>
+      <button hlmBtn variant="outline" size="sm" (click)="loadProducts()">
+        <ng-icon name="lucideRefreshCw" />
+        <span>Reintentar</span>
+      </button>
+    </div>
+  }
+
+  <!-- Tabla de Productos con Spartan UI -->
+  <div class="rounded-3xl border border-border bg-card shadow-sm overflow-hidden">
+    <div hlmTableContainer class="w-full overflow-x-auto">
+      <table hlmTable class="w-full text-left text-sm">
+        <thead hlmTHead class="bg-muted/40">
+          <tr hlmTr class="border-b border-border">
+            <th hlmTh class="py-3.5 px-4 font-semibold text-foreground">Artículo</th>
+            <th hlmTh class="py-3.5 px-4 font-semibold text-foreground">ID Producto</th>
+            <th hlmTh class="py-3.5 px-4 font-semibold text-foreground text-center">Stock</th>
+            <th hlmTh class="py-3.5 px-4 font-semibold text-foreground">Sincronización Stripe</th>
+            <th hlmTh class="py-3.5 px-4 font-semibold text-foreground text-right">Precio Actual</th>
+            <th hlmTh class="py-3.5 px-4 font-semibold text-foreground text-center">Acciones</th>
+          </tr>
+        </thead>
+
+        <tbody hlmTBody class="divide-y divide-border/60">
+          @if (isLoading()) {
+            @for (row of skeletonRows; track row) {
+              <tr hlmTr>
+                <td hlmTd class="py-4 px-4">
+                  <div class="flex items-center gap-3">
+                    <hlm-skeleton class="size-12 rounded-xl shrink-0" />
+                    <div class="space-y-1.5 flex-1">
+                      <hlm-skeleton class="h-4 w-36" />
+                      <hlm-skeleton class="h-3 w-48" />
+                    </div>
+                  </div>
+                </td>
+                <td hlmTd class="py-4 px-4"><hlm-skeleton class="h-4 w-28" /></td>
+                <td hlmTd class="py-4 px-4 text-center"><hlm-skeleton class="h-5 w-12 mx-auto rounded-full" /></td>
+                <td hlmTd class="py-4 px-4"><hlm-skeleton class="h-4 w-36" /></td>
+                <td hlmTd class="py-4 px-4 text-right"><hlm-skeleton class="h-5 w-20 ml-auto" /></td>
+                <td hlmTd class="py-4 px-4 text-center"><hlm-skeleton class="h-8 w-28 mx-auto rounded-3xl" /></td>
+              </tr>
+            }
+          } @else if (filteredProducts().length === 0) {
+            <tr hlmTr>
+              <td hlmTd colspan="6" class="py-12 text-center">
+                <div hlmEmpty class="border-0 p-4">
+                  <div hlmEmptyHeader>
+                    <div class="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground mb-2 mx-auto">
+                      <ng-icon name="lucidePackage" class="text-2xl" />
+                    </div>
+                    <h3 hlmEmptyTitle>No se encontraron productos</h3>
+                    <p hlmEmptyDescription>
+                      @if (searchQuery()) {
+                        No hay artículos que coincidan con "{{ searchQuery() }}".
+                      } @else {
+                        Aún no hay productos registrados en el sistema.
+                      }
+                    </p>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          } @else {
+            @for (product of filteredProducts(); track product.id) {
+              <tr hlmTr class="transition-colors hover:bg-muted/20">
+                <!-- Artículo: Imagen, Nombre y Descripción -->
+                <td hlmTd class="py-3 px-4">
+                  <div class="flex items-center gap-3 min-w-[220px]">
+                    <div class="relative size-12 shrink-0 overflow-hidden rounded-xl bg-muted/30 border border-border/50 flex items-center justify-center p-1">
+                      @if (product.imageUrl) {
+                        <img
+                          [src]="product.imageUrl"
+                          [alt]="product.name"
+                          class="h-full w-full object-contain"
+                          loading="lazy"
+                        />
+                      } @else {
+                        <ng-icon name="lucideImageOff" class="text-base text-muted-foreground opacity-50" />
+                      }
+                    </div>
+
+                    <div class="min-w-0">
+                      <div class="font-semibold text-foreground truncate max-w-[240px]">
+                        {{ product.name }}
+                      </div>
+                      <div class="text-xs text-muted-foreground truncate max-w-[240px]">
+                        {{ product.description }}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- ID del Producto -->
+                <td hlmTd class="py-3 px-4 whitespace-nowrap">
+                  <span class="rounded-md bg-muted/60 px-2 py-1 font-mono text-xs font-medium text-foreground">
+                    {{ product.id }}
+                  </span>
+                </td>
+
+                <!-- Stock -->
+                <td hlmTd class="py-3 px-4 text-center whitespace-nowrap">
+                  <span
+                    hlmBadge
+                    [variant]="(product.stock ?? 0) > 0 ? 'secondary' : 'destructive'"
+                    class="text-xs font-semibold"
+                  >
+                    {{ product.stock ?? 0 }} unids
+                  </span>
+                </td>
+
+                <!-- Datos Stripe -->
+                <td hlmTd class="py-3 px-4">
+                  <div class="flex flex-col gap-1 text-xs font-mono">
+                    @if (product.stripeProductId) {
+                      <span class="text-muted-foreground truncate max-w-[180px]" title="Stripe Product ID">
+                        Prod: {{ product.stripeProductId }}
+                      </span>
+                    }
+                    @if (product.stripePriceId) {
+                      <span class="text-muted-foreground/80 truncate max-w-[180px]" title="Stripe Price ID">
+                        Price: {{ product.stripePriceId }}
+                      </span>
+                    }
+                  </div>
+                </td>
+
+                <!-- Precio Actual -->
+                <td hlmTd class="py-3 px-4 text-right whitespace-nowrap">
+                  <span class="text-sm font-bold text-foreground">
+                    {{ product.unitAmountCents | centsToCurrency }}
+                  </span>
+                  <span class="block text-[11px] text-muted-foreground">
+                    {{ product.unitAmountCents }} centavos
+                  </span>
+                </td>
+
+                <!-- Botón de Acción -->
+                <td hlmTd class="py-3 px-4 text-center whitespace-nowrap">
+                  <a
+                    hlmBtn
+                    variant="outline"
+                    size="sm"
+                    [routerLink]="['/admin/products', product.id, 'price']"
+                    class="gap-1.5"
+                  >
+                    <ng-icon name="lucidePencil" />
+                    <span>Cambiar Precio</span>
+                  </a>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+

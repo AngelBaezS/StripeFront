@@ -1,0 +1,204 @@
+<section class="mx-auto max-w-5xl space-y-6">
+  <!-- Cabecera de Navegación -->
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div class="space-y-1">
+      <div class="flex items-center gap-2">
+        <span hlmBadge variant="secondary">Panel Admin</span>
+        <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          Agregar Nuevo Producto
+        </h1>
+      </div>
+      <p class="text-sm text-muted-foreground">
+        Completa la información del artículo para publicarlo en el catálogo de la tienda
+      </p>
+    </div>
+
+    <a hlmBtn variant="outline" size="sm" routerLink="/admin/products" class="w-fit gap-2">
+      <ng-icon name="lucideArrowLeft" />
+      <span>Volver al Catálogo</span>
+    </a>
+  </div>
+
+  <!-- Contenedor Principal: Formulario + Vista Previa -->
+  <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+    <!-- Columna Izquierda: Formulario de Creación (2/3) -->
+    <div hlmCard class="lg:col-span-2 border border-border shadow-sm">
+      <div hlmCardHeader>
+        <h2 hlmCardTitle class="flex items-center gap-2 text-lg font-semibold">
+          <ng-icon name="lucidePackagePlus" class="text-lg" />
+          <span>Datos del Producto</span>
+        </h2>
+        <p hlmCardDescription>
+          El precio se ingresa en centavos (ejemplo: 1999 equivale a $19.99)
+        </p>
+      </div>
+
+      <div hlmCardContent>
+        <form [formGroup]="productForm" (ngSubmit)="onSubmit()" class="space-y-5">
+          @if (errorMessage()) {
+            <div hlmAlert variant="destructive">
+              <p hlmAlertDescription>{{ errorMessage() }}</p>
+            </div>
+          }
+
+          <!-- Nombre del Producto -->
+          <div hlmField class="space-y-1.5">
+            <label hlmFieldLabel for="prod-name">Nombre del producto</label>
+            <input
+              hlmInput
+              id="prod-name"
+              type="text"
+              formControlName="name"
+              placeholder="ej. Audífonos Inalámbricos Pro"
+            />
+            @if (isFieldInvalid('name')) {
+              <hlm-field-error>
+                El nombre del producto es obligatorio (mínimo 2 caracteres).
+              </hlm-field-error>
+            }
+          </div>
+
+          <!-- Descripción -->
+          <div hlmField class="space-y-1.5">
+            <label hlmFieldLabel for="prod-description">Descripción</label>
+            <textarea
+              hlmTextarea
+              id="prod-description"
+              rows="3"
+              formControlName="description"
+              placeholder="Describe las características principales del producto..."
+            ></textarea>
+            @if (isFieldInvalid('description')) {
+              <hlm-field-error>
+                La descripción es obligatoria (mínimo 5 caracteres).
+              </hlm-field-error>
+            }
+          </div>
+
+          <!-- Stock y Precio en Centavos -->
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div hlmField class="space-y-1.5">
+              <label hlmFieldLabel for="prod-stock">Stock disponible</label>
+              <input
+                hlmInput
+                id="prod-stock"
+                type="number"
+                min="0"
+                step="1"
+                formControlName="stock"
+                placeholder="ej. 25"
+              />
+              @if (isFieldInvalid('stock')) {
+                <hlm-field-error>
+                  Ingresa una cantidad de stock válida (0 o mayor).
+                </hlm-field-error>
+              }
+            </div>
+
+            <div hlmField class="space-y-1.5">
+              <label hlmFieldLabel for="prod-price">Precio en centavos (unitAmountCents)</label>
+              <input
+                hlmInput
+                id="prod-price"
+                type="number"
+                min="1"
+                step="1"
+                formControlName="unitAmountCents"
+                placeholder="ej. 2500 ($25.00)"
+              />
+              @if (isFieldInvalid('unitAmountCents')) {
+                <hlm-field-error>
+                  Ingresa el monto en centavos (mayor a 0).
+                </hlm-field-error>
+              }
+            </div>
+          </div>
+
+          <!-- URL de la Imagen -->
+          <div hlmField class="space-y-1.5">
+            <label hlmFieldLabel for="prod-image">URL de la Imagen (imageUrl)</label>
+            <input
+              hlmInput
+              id="prod-image"
+              type="url"
+              formControlName="imageUrl"
+              (input)="onImageUrlInput()"
+              placeholder="https://ejemplo.com/imagen-producto.jpg"
+            />
+            @if (isFieldInvalid('imageUrl')) {
+              <hlm-field-error>
+                La URL de la imagen es obligatoria.
+              </hlm-field-error>
+            }
+          </div>
+
+          <!-- Acciones del Formulario -->
+          <div class="flex items-center justify-end gap-3 pt-4 border-t border-border/50">
+            <a hlmBtn variant="ghost" routerLink="/admin/products">Cancelar</a>
+            <button hlmBtn type="submit" [disabled]="isLoading()" class="gap-2">
+              @if (isLoading()) {
+                <hlm-spinner class="mr-1" />
+                <span>Guardando producto...</span>
+              } @else {
+                <ng-icon name="lucidePlusCircle" />
+                <span>Guardar Producto</span>
+              }
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Columna Derecha: Vista Previa de la Card (1/3) -->
+    <div class="space-y-3">
+      <h3 class="text-sm font-medium text-muted-foreground px-1">Vista previa en tienda</h3>
+
+      <div
+        hlmCard
+        size="sm"
+        class="mx-auto max-w-[260px] flex flex-col justify-between overflow-hidden border border-border shadow-md"
+      >
+        <div>
+          <div class="relative aspect-4/3 w-full overflow-hidden bg-muted/30 flex items-center justify-center p-2">
+            @if (productForm.get('imageUrl')?.value && !previewImageError()) {
+              <img
+                [src]="productForm.get('imageUrl')?.value"
+                alt="Vista previa"
+                (error)="onPreviewImageError()"
+                class="h-full w-full object-contain"
+              />
+            } @else {
+              <div class="flex h-full w-full flex-col items-center justify-center gap-1.5 text-muted-foreground">
+                <ng-icon name="lucideImageOff" class="text-2xl opacity-50" />
+                <span class="text-xs">Vista previa de imagen</span>
+              </div>
+            }
+          </div>
+
+          <div hlmCardHeader class="pb-1.5">
+            <h4 hlmCardTitle class="text-base font-semibold line-clamp-1 text-foreground">
+              {{ productForm.get('name')?.value || 'Nombre del producto' }}
+            </h4>
+            <p hlmCardDescription class="line-clamp-2 text-xs text-muted-foreground min-h-8">
+              {{ productForm.get('description')?.value || 'Descripción breve del producto en el catálogo...' }}
+            </p>
+          </div>
+        </div>
+
+        <div hlmCardFooter class="pt-3 border-t border-border/50 flex items-center justify-between gap-2">
+          <div class="flex flex-col">
+            <span class="text-[11px] text-muted-foreground">Precio</span>
+            <span class="text-sm font-bold text-foreground">
+              {{ (productForm.get('unitAmountCents')?.value || 0) | centsToCurrency }}
+            </span>
+          </div>
+
+          <span hlmBadge variant="outline" class="text-xs">
+            Stock: {{ productForm.get('stock')?.value ?? 0 }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+

@@ -1,0 +1,105 @@
+<div class="min-h-[85vh] flex items-center justify-center p-4">
+  <div hlmCard class="w-full max-w-md shadow-lg border border-border">
+    <div hlmCardHeader class="space-y-1">
+      <h2 hlmCardTitle class="text-2xl font-bold tracking-tight text-center">Crear Cuenta</h2>
+      <p hlmCardDescription class="text-center text-muted-foreground">
+        Ingresa tus datos para registrarte en la tienda
+      </p>
+    </div>
+
+    <div hlmCardContent>
+      <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" class="space-y-4">
+        @if (errorMessage()) {
+          <div hlmAlert variant="destructive">
+            <p hlmAlertDescription>{{ errorMessage() }}</p>
+          </div>
+        }
+
+        <div hlmField class="space-y-1.5">
+          <label hlmFieldLabel for="reg-username">Usuario</label>
+          <input
+            hlmInput
+            id="reg-username"
+            type="text"
+            formControlName="username"
+            placeholder="ej. juanperez"
+            autocomplete="username"
+          />
+          @if (isFieldInvalid('username')) {
+            <hlm-field-error>
+              El usuario es requerido (mínimo 3 caracteres).
+            </hlm-field-error>
+          }
+        </div>
+
+        <div hlmField class="space-y-1.5">
+          <label hlmFieldLabel for="reg-email">Correo Electrónico</label>
+          <input
+            hlmInput
+            id="reg-email"
+            type="email"
+            formControlName="email"
+            placeholder="correo@ejemplo.com"
+            autocomplete="email"
+          />
+          @if (isFieldInvalid('email')) {
+            <hlm-field-error>
+              Ingresa un correo electrónico válido.
+            </hlm-field-error>
+          }
+        </div>
+
+        <div hlmField class="space-y-1.5">
+          <label hlmFieldLabel for="reg-password">Contraseña</label>
+          <input
+            hlmInput
+            id="reg-password"
+            type="password"
+            formControlName="password"
+            placeholder="Mínimo 6 caracteres"
+            autocomplete="new-password"
+          />
+          @if (isFieldInvalid('password')) {
+            <hlm-field-error>
+              La contraseña es requerida (mínimo 6 caracteres).
+            </hlm-field-error>
+          }
+        </div>
+
+        <div hlmField class="space-y-1.5">
+          <label hlmFieldLabel for="reg-phone">Teléfono</label>
+          <input
+            hlmInput
+            id="reg-phone"
+            type="tel"
+            formControlName="phone"
+            placeholder="ej. +52 55 1234 5678"
+            autocomplete="tel"
+          />
+          @if (isFieldInvalid('phone')) {
+            <hlm-field-error>
+              Ingresa un número de teléfono válido (7 a 15 dígitos).
+            </hlm-field-error>
+          }
+        </div>
+
+        <button hlmBtn type="submit" class="w-full mt-2" [disabled]="isLoading()">
+          @if (isLoading()) {
+            <hlm-spinner class="mr-2" />
+            <span>Creando cuenta...</span>
+          } @else {
+            <span>Registrarse</span>
+          }
+        </button>
+      </form>
+    </div>
+
+    <div hlmCardFooter class="flex justify-center border-t border-border/50 pt-4 text-sm text-muted-foreground">
+      <span>¿Ya tienes una cuenta?</span>
+      <a routerLink="/auth/login" class="ml-1 font-medium text-primary hover:underline">
+        Inicia sesión aquí
+      </a>
+    </div>
+  </div>
+</div>
+

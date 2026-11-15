@@ -1,0 +1,117 @@
+<div
+  hlmCard
+  size="sm"
+  class="border border-border transition-shadow hover:shadow-md"
+>
+  <!-- Inputs ocultos con los IDs del ítem y del producto -->
+  <input type="hidden" name="cartItemId" [value]="item().id" />
+  <input type="hidden" name="productId" [value]="item().productId" />
+
+  <div hlmCardContent class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <!-- Imagen + Información del Producto -->
+    <div class="flex items-center gap-4 min-w-0 flex-1">
+      <div class="relative size-20 shrink-0 overflow-hidden rounded-2xl bg-muted/30 border border-border/50 flex items-center justify-center p-1.5">
+        @if (item().imageUrl && !imageError()) {
+          <img
+            [src]="item().imageUrl"
+            [alt]="item().productName"
+            (error)="onImageError()"
+            class="h-full w-full object-contain"
+            loading="lazy"
+          />
+        } @else {
+          <ng-icon name="lucideImageOff" class="text-xl text-muted-foreground opacity-50" />
+        }
+      </div>
+
+      <div class="min-w-0 flex-1 space-y-1">
+        <div class="flex items-center gap-2 flex-wrap">
+          <h3 class="text-base font-semibold text-foreground truncate">
+            {{ item().productName }}
+          </h3>
+          @if (item().availableStock !== null && item().availableStock !== undefined) {
+            <span hlmBadge variant="secondary" class="text-[11px]">
+              Stock disp: {{ item().availableStock }}
+            </span>
+          }
+        </div>
+
+        <p class="text-xs text-muted-foreground line-clamp-1">
+          {{ item().description }}
+        </p>
+
+        <div class="text-xs text-muted-foreground pt-0.5">
+          Precio unitario:
+          <span class="font-medium text-foreground">
+            {{ item().unitAmountCents | centsToCurrency }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controles de Cantidad, Subtotal y Eliminar -->
+    <div class="flex items-center justify-between sm:justify-end gap-4 pt-3 sm:pt-0 border-t sm:border-t-0 border-border/50">
+      <!-- Controles de Cantidad (- / cantidad / +) -->
+      <div hlmButtonGroup aria-label="Control de cantidad">
+        <button
+          hlmBtn
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          (click)="onDecrement()"
+          [disabled]="isProcessing()"
+          [title]="item().quantity <= 1 ? 'Eliminar producto del carrito' : 'Reducir una unidad'"
+          aria-label="Reducir cantidad"
+        >
+          <ng-icon name="lucideMinus" />
+        </button>
+
+        <span
+          hlmButtonGroupText
+          class="min-w-10 justify-center bg-background px-2.5 text-xs font-semibold"
+        >
+          @if (isProcessing()) {
+            <hlm-spinner />
+          } @else {
+            {{ item().quantity }}
+          }
+        </span>
+
+        <button
+          hlmBtn
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          (click)="onIncrement()"
+          [disabled]="isProcessing() || (item().availableStock !== null && item().quantity >= item().availableStock)"
+          title="Agregar una unidad más"
+          aria-label="Aumentar cantidad"
+        >
+          <ng-icon name="lucidePlus" />
+        </button>
+      </div>
+
+      <!-- Subtotal del Ítem -->
+      <div class="text-right min-w-24">
+        <span class="block text-[11px] text-muted-foreground">Subtotal</span>
+        <span class="text-sm font-bold text-foreground">
+          {{ item().subtotalCents | centsToCurrency }}
+        </span>
+      </div>
+
+      <!-- Eliminar Ítem -->
+      <button
+        hlmBtn
+        type="button"
+        variant="destructive"
+        size="icon-sm"
+        (click)="onRemove()"
+        [disabled]="isProcessing()"
+        title="Eliminar del carrito"
+      >
+        <ng-icon name="lucideTrash2" />
+      </button>
+    </div>
+  </div>
+</div>
+

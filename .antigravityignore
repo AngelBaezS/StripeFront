@@ -1,0 +1,34 @@
+# Variables de entorno y perfiles locales de Spring Boot
+.env
+.env.*
+*.local
+application-local.yml
+application-local.properties
+application-dev.yml
+application-secrets.*
+
+# Llaves criptográficas, certificados y keystores (JWT / TLS)
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.crt
+*.cer
+*secret*
+*private*
+
+# Peticiones HTTP locales y volcados de red (suelen contener headers Authorization: Bearer)
+*.http
+*.rest
+*.har
+*postman*
+
+# Compilados y logs (pueden capturar tokens JWT en stacktraces o trazas HTTP)
+target/
+build/
+logs/
+*.log
+*.dump
+*.hprof

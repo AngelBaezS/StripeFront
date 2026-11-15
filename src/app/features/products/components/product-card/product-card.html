@@ -1,0 +1,71 @@
+<div hlmCard size="sm"
+  class="group h-full flex flex-col justify-between overflow-hidden border border-border transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5">
+  <!-- Campo ID oculto para enviarlo al agregar al carrito -->
+  <input type="hidden" name="productId" [value]="product().id" />
+
+  <div>
+    <!-- Imagen del Producto -->
+    <div class="relative aspect-4/3 w-full overflow-hidden bg-muted/30 flex items-center justify-center p-2">
+      @if (product().imageUrl && !imageError()) {
+      <img [src]="product().imageUrl" [alt]="product().name" (error)="onImageError()"
+        class="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105" loading="lazy" />
+      } @else {
+      <div class="flex h-full w-full flex-col items-center justify-center gap-1.5 text-muted-foreground">
+        <ng-icon name="lucideImageOff" class="text-2xl opacity-50" />
+        <span class="text-xs">Sin imagen</span>
+      </div>
+      }
+
+      <!-- Badge de Precio superpuesto -->
+      <!-- <div class="absolute top-3 right-3">
+        <span hlmBadge variant="secondary"
+          class="shadow-sm font-semibold text-sm px-3 py-1 backdrop-blur-md bg-background/90">
+          {{ product().unitAmountCents | centsToCurrency }}
+        </span>
+      </div> -->
+    </div>
+
+    <!-- Encabezado y Descripción -->
+    <div hlmCardHeader class="pb-1.5">
+      <h3 hlmCardTitle class="text-base font-semibold line-clamp-1 text-foreground">
+        {{ product().name }}
+      </h3>
+      <p hlmCardDescription class="line-clamp-2 text-xs text-muted-foreground min-h-8">
+        {{ product().description }}
+      </p>
+    </div>
+  </div>
+
+  <!-- Pie de la Card con Precio y Acción -->
+  <div hlmCardFooter class="pt-3 border-t border-border/50 flex items-center justify-between gap-2">
+    <div class="flex flex-col">
+      <span class="text-[11px] text-muted-foreground">Precio</span>
+      <span class="text-sm font-bold text-foreground">
+        {{ product().unitAmountCents | centsToCurrency }}
+      </span>
+    </div>
+
+    @if (authService.isClient()) {
+      <button hlmBtn type="button" size="sm" (click)="onAdd()" [disabled]="isAdding()" class="gap-1.5">
+        @if (isAdding()) {
+          <hlm-spinner />
+          <span>Agregando...</span>
+        } @else {
+          <ng-icon name="lucideShoppingCart" />
+          <span>Agregar</span>
+        }
+      </button>
+    } @else if (authService.isAdmin()) {
+      <a
+        hlmBtn
+        variant="outline"
+        size="sm"
+        [routerLink]="['/admin/products', product().id, 'price']"
+        class="gap-1.5"
+      >
+        <ng-icon name="lucidePencil" />
+        <span>Editar Precio</span>
+      </a>
+    }
+  </div>
+</div>

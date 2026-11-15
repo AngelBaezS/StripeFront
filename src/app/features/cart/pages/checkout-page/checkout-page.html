@@ -1,0 +1,539 @@
+<div class="mx-auto max-w-6xl space-y-6">
+  <!-- Encabezado -->
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+        {{ targetOrderId() ? 'Completar Pago de Orden' : 'Finalizar Compra' }}
+      </h1>
+      <p class="text-sm text-muted-foreground mt-1">
+        {{ targetOrderId() ? 'Retoma el pago seguro de tu orden con Stripe Elements.' : 'Revisa los detalles de tu
+        pedido y selecciona tu método de pago preferido.' }}
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      @if (activeOrderId(); as cancelId) {
+      <app-cancel-order-dialog [orderId]="cancelId" [isCanceling]="isCancelingOrder()"
+        [disabled]="isProcessingPayment() || isInitializingOrder() || isInitializingSpei()"
+        (confirmed)="cancelActiveOrder($event)" />
+      }
+      <a hlmBtn variant="outline" size="sm" [routerLink]="targetOrderId() ? '/orders' : '/cart'" class="gap-1.5">
+        <ng-icon name="lucideArrowLeft" />
+        <span>{{ targetOrderId() ? 'Volver a Mis Pedidos' : 'Volver al Carrito' }}</span>
+      </a>
+    </div>
+  </div>
+
+  @if (errorMessage()) {
+  <div hlmAlert variant="destructive" class="border-destructive/50">
+    <h4 hlmAlertTitle class="font-semibold">Atención</h4>
+    <p hlmAlertDescription>{{ errorMessage() }}</p>
+  </div>
+  }
+
+  <div class="grid grid-cols-1 gap-8 lg:grid-cols-12 items-start">
+    <!-- COLUMNA IZQUIERDA: Resumen del Pedido (5 cols) -->
+    <section hlmCard class="lg:col-span-5 border border-border shadow-sm">
+      <div hlmCardHeader>
+        <div class="flex items-center justify-between">
+          <h2 hlmCardTitle class="text-lg font-semibold">Resumen del Pedido</h2>
+          @if (existingOrder(); as currentOrder) {
+          <span hlmBadge variant="secondary" class="font-mono text-xs">
+            {{ currentOrder.status }}
+          </span>
+          } @else if (cart(); as currentCart) {
+          <span hlmBadge [variant]="orderCreated() ? 'secondary' : 'default'">
+            {{ orderCreated() ? 'LOCKED' : currentCart.status }}
+          </span>
+          }
+        </div>
+        <p hlmCardDescription>
+          Precios en {{ activeCurrency() }}
+          @if (checkoutSession()) {
+          <span class="text-xs text-muted-foreground">· Sincronizado con Stripe Checkout</span>
+          }
+        </p>
+      </div>
+
+      <div hlmCardContent class="space-y-4">
+        @if (isLoadingCart()) {
+        <div class="space-y-3">
+          <hlm-skeleton class="h-14 w-full" />
+          <hlm-skeleton class="h-14 w-full" />
+          <hlm-skeleton class="h-10 w-full mt-4" />
+        </div>
+        } @else if (checkoutSession(); as session) {
+        <!-- Resumen sincronizado directamente con Stripe Checkout Session -->
+        <div class="divide-y divide-border/60">
+          @for (item of session.lineItems; track item.id) {
+          <div class="py-3 flex items-center justify-between gap-3 text-sm first:pt-0 last:pb-0">
+            <div class="flex-1 min-w-0">
+              <p class="font-medium text-foreground truncate">{{ item.name }}</p>
+              <p class="text-xs text-muted-foreground">
+                {{ item.quantity }} × {{ item.unitAmount.amount }}
+              </p>
+            </div>
+            <div class="text-right whitespace-nowrap">
+              @if (item.discount.minorUnitsAmount > 0) {
+              <span class="block text-xs text-muted-foreground line-through">
+                {{ item.subtotal.amount }}
+              </span>
+              }
+              <span class="font-semibold text-foreground">
+                {{ item.total.amount }}
+              </span>
+            </div>
+          </div>
+          }
+        </div>
+
+        <hlm-separator />
+
+        @if (hasCheckoutBreakdown()) {
+        <div class="space-y-1.5 text-xs text-muted-foreground">
+          <div class="flex items-center justify-between">
+            <span>Subtotal</span>
+            <span>{{ session.total.subtotal.amount }}</span>
+          </div>
+          @if (session.total.discount.minorUnitsAmount > 0) {
+          <div class="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
+            <span>Descuento</span>
+            <span>-{{ session.total.discount.amount }}</span>
+          </div>
+          }
+          @if (session.total.shippingRate.minorUnitsAmount > 0) {
+          <div class="flex items-center justify-between">
+            <span>Envío</span>
+            <span>{{ session.total.shippingRate.amount }}</span>
+          </div>
+          }
+          @if (session.total.taxExclusive.minorUnitsAmount > 0) {
+          <div class="flex items-center justify-between">
+            <span>Impuestos</span>
+            <span>{{ session.total.taxExclusive.amount }}</span>
+          </div>
+          } @else if (session.total.taxInclusive.minorUnitsAmount > 0) {
+          <div class="flex items-center justify-between">
+            <span>Impuestos incluidos</span>
+            <span>{{ session.total.taxInclusive.amount }}</span>
+          </div>
+          }
+        </div>
+
+        <hlm-separator />
+        }
+
+        <div class="flex items-center justify-between text-base font-bold">
+          <span class="text-foreground">Total a Pagar ({{ activeCurrency() }})</span>
+          <span class="text-xl text-primary">
+            {{ session.total?.total?.amount ?? ((existingOrder()?.totalAmountCents ?? cart()?.totalAmountCents) |
+            centsToCurrency: activeCurrency()) }}
+          </span>
+        </div>
+
+        @if (activeOrderId(); as orderRef) {
+        <div class="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground flex items-center gap-2">
+          <ng-icon name="lucideShieldCheck" class="text-base text-primary shrink-0" />
+          <span>
+            Orden: <strong class="font-mono">{{ orderRef }}</strong>
+          </span>
+        </div>
+        }
+        } @else if (existingOrder(); as currentOrder) {
+        <!-- Resumen basado en Orden Existente -->
+        <div class="divide-y divide-border/60">
+          @for (item of currentOrder.items; track item.productId) {
+          <div class="py-3 flex items-center justify-between gap-3 text-sm first:pt-0 last:pb-0">
+            <div class="flex-1 min-w-0">
+              <p class="font-medium text-foreground truncate">{{ item.productName }}</p>
+              <p class="text-xs text-muted-foreground">
+                {{ item.quantity }} × {{ item.unitAmountCents | centsToCurrency: activeCurrency() }}
+              </p>
+            </div>
+            <span class="font-semibold text-foreground whitespace-nowrap">
+              {{ item.subtotalCents | centsToCurrency: activeCurrency() }}
+            </span>
+          </div>
+          }
+        </div>
+
+        <hlm-separator />
+
+        <div class="flex items-center justify-between text-base font-bold">
+          <span class="text-foreground">Total a Pagar</span>
+          <span class="text-xl text-primary">
+            {{ currentOrder.totalAmountCents | centsToCurrency: activeCurrency() }}
+          </span>
+        </div>
+
+        <div class="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground flex items-center gap-2">
+          <ng-icon name="lucideShieldCheck" class="text-base text-primary shrink-0" />
+          <span>
+            Orden: <strong class="font-mono">{{ currentOrder.id }}</strong>
+          </span>
+        </div>
+        } @else if (cart(); as currentCart) {
+        <!-- Resumen basado en Carrito Activo -->
+        <div class="divide-y divide-border/60">
+          @for (item of currentCart.items; track item.productId) {
+          <div class="py-3 flex items-center justify-between gap-3 text-sm first:pt-0 last:pb-0">
+            <div class="flex-1 min-w-0">
+              <p class="font-medium text-foreground truncate">{{ item.productName }}</p>
+              <p class="text-xs text-muted-foreground">
+                {{ item.quantity }} × {{ item.unitAmountCents | centsToCurrency: activeCurrency() }}
+              </p>
+            </div>
+            <span class="font-semibold text-foreground whitespace-nowrap">
+              {{ item.subtotalCents | centsToCurrency: activeCurrency() }}
+            </span>
+          </div>
+          }
+        </div>
+
+        <hlm-separator />
+
+        <div class="flex items-center justify-between text-base font-bold">
+          <span class="text-foreground">Total a Pagar</span>
+          <span class="text-xl text-primary">
+            {{ currentCart.totalAmountCents | centsToCurrency: activeCurrency() }}
+          </span>
+        </div>
+
+        @if (orderCreated()) {
+        <div class="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground flex items-center gap-2">
+          <ng-icon name="lucideShieldCheck" class="text-base text-primary shrink-0" />
+          <span>
+            Tu carrito ha sido reservado para esta transacción (estado LOCKED).
+          </span>
+        </div>
+        }
+        }
+      </div>
+    </section>
+
+    <!-- COLUMNA DERECHA: Opciones de Pago (7 cols) -->
+    <section hlmCard class="lg:col-span-7 border border-border shadow-sm">
+      <div hlmCardHeader>
+        <h2 hlmCardTitle class="text-lg font-semibold">Método de Pago</h2>
+        <p hlmCardDescription>
+          Selecciona pagar en sitio (Tarjeta / SPEI) o a través de la pasarela de Stripe.
+        </p>
+      </div>
+
+      <div hlmCardContent class="space-y-6">
+        <hlm-tabs [tab]="speiResult() || mountedElementsMode() === 'spei' ? 'spei' : 'direct'" class="w-full">
+          <hlm-tabs-list class="grid w-full grid-cols-3" aria-label="Modalidades de Pago">
+            <button hlmTabsTrigger="direct"
+              [disabled]="(orderCreated() && !targetOrderId() && mountedElementsMode() !== 'direct') || !!speiResult() || mountedElementsMode() === 'spei'">
+              Tarjeta / Elements
+            </button>
+            <button hlmTabsTrigger="spei"
+              [disabled]="orderCreated() && !targetOrderId() && !speiResult() && mountedElementsMode() !== 'spei'">
+              Transferencia SPEI
+            </button>
+            <button hlmTabsTrigger="link"
+              [disabled]="(orderCreated() && !targetOrderId()) || !!speiResult() || mountedElementsMode() === 'spei'">
+              Stripe Checkout
+            </button>
+          </hlm-tabs-list>
+
+          <!-- TAB 1: PAGO DIRECTO CON STRIPE ELEMENTS -->
+          <div hlmTabsContent="direct" class="space-y-5 pt-4">
+            @if (mountedElementsMode() !== 'direct') {
+            <div class="space-y-3">
+              <p class="text-sm text-muted-foreground leading-relaxed">
+                Al continuar, se bloqueará tu carrito actual para garantizar el stock y se cargará el formulario seguro
+                de Stripe Elements dentro de la página para completar tu pago.
+              </p>
+
+              <div
+                class="rounded-lg border border-border bg-muted/30 p-3 flex items-center gap-2 text-xs text-muted-foreground">
+                <ng-icon name="lucideCreditCard" class="text-base shrink-0" />
+                <span>Acepta tarjetas de crédito y débito (Visa, Mastercard, American Express) y transferencia bancaria
+                  SPEI.</span>
+              </div>
+
+              <button hlmBtn size="lg" class="w-full gap-2 mt-2"
+                [disabled]="isInitializingOrder() || (!cart()?.items?.length && !existingOrder()?.items?.length)"
+                (click)="initDirectPayment()">
+                @if (isInitializingOrder()) {
+                <hlm-spinner />
+                <span>Preparando pasarela segura...</span>
+                } @else {
+                <ng-icon name="lucideLock" />
+                <span>Continuar al formulario de pago</span>
+                }
+              </button>
+            </div>
+            }
+
+            <!-- CONTENEDOR DE STRIPE PAYMENT ELEMENT -->
+            <div [class.hidden]="mountedElementsMode() !== 'direct'" class="space-y-4">
+              <!-- Loader de Elements mientras monta -->
+              @if (!elementsReady()) {
+              <div class="py-6 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                <hlm-spinner />
+                <span class="text-sm">Cargando formulario seguro de Stripe...</span>
+              </div>
+              }
+
+              <!-- Elemento donde Stripe monta su iframe -->
+              <div #paymentElementContainer class="min-h-[240px] p-1"></div>
+
+              <button hlmBtn size="lg" class="w-full gap-2 font-semibold shadow"
+                [disabled]="isProcessingPayment() || !elementsReady()" (click)="confirmStripePayment()">
+                @if (isProcessingPayment()) {
+                <hlm-spinner />
+                <span>Procesando pago con Stripe...</span>
+                } @else {
+                <ng-icon name="lucideShieldCheck" />
+                <span>
+                  Pagar {{ checkoutSession()?.total?.total?.amount ?? ((existingOrder()?.totalAmountCents ??
+                  cart()?.totalAmountCents) | centsToCurrency: activeCurrency()) }}
+                </span>
+                }
+              </button>
+            </div>
+          </div>
+
+          <!-- TAB 2: PAGO DIRECTO CON SPEI -->
+          <div hlmTabsContent="spei" class="space-y-4 pt-4">
+            @if (speiResult(); as spei) {
+            <div class="rounded-lg border border-primary/25 bg-primary/5 p-5 space-y-4">
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex items-center gap-2.5">
+                  <ng-icon name="lucideLandmark" class="text-xl text-primary shrink-0" />
+                  <div>
+                    <h3 class="text-sm font-bold text-foreground">
+                      Instrucciones de Transferencia SPEI
+                    </h3>
+                    <p class="text-xs text-muted-foreground">
+                      Realiza la transferencia por el monto exacto para acreditar tu orden automáticamente.
+                    </p>
+                  </div>
+                </div>
+                <span hlmBadge variant="secondary" class="font-mono text-xs">
+                  {{ spei.status }}
+                </span>
+              </div>
+
+              @if (spei.speiDetails; as details) {
+              @if (details.recipientEmail || speiEmail()) {
+              <div
+                class="rounded-md border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                <ng-icon name="lucideMail" class="text-base shrink-0" />
+                <span>
+                  Instrucciones y ficha PDF enviadas al correo:
+                  <strong class="font-semibold">{{ details.recipientEmail || speiEmail() }}</strong>
+                </span>
+              </div>
+              }
+
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
+                <div
+                  class="sm:col-span-2 rounded-md border border-border bg-background p-3 flex items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <span class="text-xs text-muted-foreground block">CLABE Interbancaria (18 dígitos)</span>
+                    <span class="font-mono text-base font-bold tracking-wider text-foreground break-all">
+                      {{ details.clabe || 'Ver en ficha oficial de Stripe' }}
+                    </span>
+                  </div>
+                  @if (details.clabe) {
+                  <button hlmBtn variant="outline" size="sm" type="button" (click)="copySpeiClabe(details.clabe)"
+                    class="gap-1.5 shrink-0">
+                    <ng-icon [name]="speiCopied() ? 'lucideCheck' : 'lucideCopy'" />
+                    <span>{{ speiCopied() ? 'Copiada' : 'Copiar' }}</span>
+                  </button>
+                  }
+                </div>
+
+                <div class="rounded-md border border-border bg-background p-3">
+                  <span class="text-xs text-muted-foreground block">Banco Receptor</span>
+                  <span class="font-semibold text-foreground">
+                    {{ details.bankName || 'STP' }}
+                    @if (details.bankCode) {
+                    <span class="text-xs text-muted-foreground font-mono">({{ details.bankCode }})</span>
+                    }
+                  </span>
+                </div>
+
+                <div class="rounded-md border border-border bg-background p-3">
+                  <span class="text-xs text-muted-foreground block">Referencia Numérica</span>
+                  <span class="font-mono font-semibold text-foreground">
+                    {{ details.reference || 'N/A' }}
+                  </span>
+                </div>
+
+                <div
+                  class="rounded-md border border-border bg-background p-3 sm:col-span-2 flex items-center justify-between">
+                  <span class="text-xs text-muted-foreground">Monto Exacto a Transferir</span>
+                  <span class="text-base font-bold text-primary">
+                    {{ (details.amountCents ?? existingOrder()?.totalAmountCents ?? cart()?.totalAmountCents) |
+                    centsToCurrency: (details.currency || 'MXN').toUpperCase() }}
+                  </span>
+                </div>
+              </div>
+              }
+
+              <div
+                class="rounded-md bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                <ng-icon name="lucideClock" class="text-base shrink-0 mt-0.5" />
+                <span>
+                  Tu orden permanecerá reservada durante <strong>2 días (48 horas)</strong>. Si no se acredita el pago
+                  en ese plazo, la orden y el carrito se cancelarán automáticamente.
+                </span>
+              </div>
+
+              <div class="flex flex-col sm:flex-row flex-wrap gap-3 pt-1">
+                @if (spei.speiDetails?.orderId || targetOrderId()) {
+                <button hlmBtn type="button" [disabled]="isDownloadingSpeiPdf()" (click)="downloadSpeiPdf()"
+                  class="w-full sm:flex-1 gap-2 font-semibold">
+                  @if (isDownloadingSpeiPdf()) {
+                  <hlm-spinner />
+                  <span>Generando PDF...</span>
+                  } @else {
+                  <ng-icon name="lucideFileDown" />
+                  <span>Descargar Ficha SPEI (PDF)</span>
+                  }
+                </button>
+                }
+                @if (spei.paymentUrl) {
+                <a hlmBtn variant="outline" [href]="spei.paymentUrl" target="_blank" rel="noopener noreferrer"
+                  class="w-full sm:flex-1 gap-2">
+                  <ng-icon name="lucideExternalLink" />
+                  <span>Ver Ficha Stripe</span>
+                </a>
+                }
+                <a hlmBtn variant="secondary" routerLink="/orders" class="w-full sm:flex-1 gap-2">
+                  <span>Ir a Mis Pedidos</span>
+                </a>
+              </div>
+            </div>
+            } @else {
+            <div class="space-y-4">
+              <p class="text-sm text-muted-foreground leading-relaxed">
+                Genera tu CLABE interbancaria exclusiva en un solo paso. Al aceptar en el modal de confirmación,
+                procesaremos la solicitud con Stripe y descargaremos tu <strong>ficha SPEI en PDF</strong>
+                automáticamente.
+              </p>
+
+              <div class="space-y-1.5">
+                <label for="speiEmailInput" class="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <ng-icon name="lucideMail" class="text-sm text-primary" />
+                  <span>Correo electrónico para enviar instrucciones y ficha PDF</span>
+                </label>
+                <input id="speiEmailInput" hlmInput type="email" autocomplete="email"
+                  placeholder="tu-correo@ejemplo.com" [value]="speiEmail()" (input)="onSpeiEmailInput($event)"
+                  class="w-full" />
+                @if (speiEmailError()) {
+                <p class="text-xs text-destructive font-medium">{{ speiEmailError() }}</p>
+                } @else if (speiEmail().trim() && !isSpeiEmailValid()) {
+                <p class="text-xs text-destructive font-medium">Ingresa un correo electrónico válido para continuar.</p>
+                } @else {
+                <p class="text-xs text-muted-foreground">
+                  Usaremos este correo para enviarte los datos de transferencia (CLABE, STP, referencia y PDF adjunto).
+                </p>
+                }
+              </div>
+
+              <div
+                class="rounded-lg border border-border bg-muted/30 p-3 flex items-center gap-2 text-xs text-muted-foreground">
+                <ng-icon name="lucideLandmark" class="text-base shrink-0" />
+                <span>Sin comisiones por tarjeta. Vigencia de 48 horas (2 días) antes de cancelación automática.</span>
+              </div>
+
+              <hlm-alert-dialog>
+                <button hlmAlertDialogTrigger hlmBtn size="lg" type="button" class="w-full gap-2 mt-2"
+                  [disabled]="isInitializingSpei() || isProcessingPayment() || (!cart()?.items?.length && !existingOrder()?.items?.length) || !isSpeiEmailValid()">
+                  @if (isInitializingSpei() || isProcessingPayment()) {
+                  <hlm-spinner />
+                  <span>Generando CLABE y ficha SPEI...</span>
+                  } @else {
+                  <ng-icon name="lucideLandmark" />
+                  <span>Confirmar y Generar Ficha SPEI</span>
+                  }
+                </button>
+
+                <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+                  <hlm-alert-dialog-header>
+                    <hlm-alert-dialog-media class="bg-primary/10 text-primary">
+                      <ng-icon name="lucideLandmark" />
+                    </hlm-alert-dialog-media>
+                    <h2 hlmAlertDialogTitle>¿Confirmar pago por Transferencia SPEI?</h2>
+                    <p hlmAlertDialogDescription>
+                      Se generará una cuenta CLABE exclusiva por
+                      <strong class="text-foreground">
+                        {{ (existingOrder()?.totalAmountCents ?? cart()?.totalAmountCents) | centsToCurrency:
+                        activeCurrency() }}
+                      </strong>
+                      y se enviarán las instrucciones y ficha PDF a
+                      <strong class="text-foreground">{{ speiEmail().trim() }}</strong>.
+                      Al aceptar, se iniciará la generación y descarga automática del comprobante.
+                    </p>
+                  </hlm-alert-dialog-header>
+
+                  <hlm-alert-dialog-footer>
+                    <button hlmAlertDialogCancel type="button"
+                      [disabled]="isInitializingSpei() || isProcessingPayment()" (click)="ctx.close()">
+                      Cancelar
+                    </button>
+                    <button hlmAlertDialogAction type="button"
+                      [disabled]="isInitializingSpei() || isProcessingPayment()" (click)="initSpeiPayment(ctx.close)"
+                      class="gap-2">
+                      <ng-icon name="lucideLandmark" />
+                      <span>Aceptar y Generar Ficha</span>
+                    </button>
+                  </hlm-alert-dialog-footer>
+                </hlm-alert-dialog-content>
+              </hlm-alert-dialog>
+            </div>
+            }
+
+            <!-- CONTENEDOR OCULTO DE STRIPE PAYMENT ELEMENT PARA CONFIRMACIÓN AUTOMÁTICA SPEI -->
+            <div class="h-0 overflow-hidden opacity-0 pointer-events-none" aria-hidden="true">
+              <div #speiPaymentElementContainer class="min-h-[240px]"></div>
+            </div>
+          </div>
+
+          <!-- TAB 3: LINK DE PAGO EXTERNO (CHECKOUT SESSION) -->
+          <div hlmTabsContent="link" class="space-y-4 pt-4">
+            <p class="text-sm text-muted-foreground leading-relaxed">
+              Se abrirá la pasarela hospedada de Stripe en una <strong>nueva pestaña</strong> para completar tu compra
+              de forma 100% segura. Una vez completado el pago, Stripe te redirigirá automáticamente de vuelta a la tienda.
+            </p>
+
+            <button hlmBtn variant="secondary" size="lg" class="w-full gap-2"
+              [disabled]="isInitializingOrder() || (!cart()?.items?.length && !existingOrder()?.items?.length)"
+              (click)="redirectToPaymentLink()">
+              @if (isInitializingOrder()) {
+              <hlm-spinner />
+              <span>Abriendo Stripe Checkout...</span>
+              } @else {
+              <ng-icon name="lucideExternalLink" />
+              <span>Ir a Stripe Checkout</span>
+              }
+            </button>
+
+            @if (paymentLinkUrl(); as checkoutUrl) {
+            <div class="rounded-lg border border-primary/25 bg-primary/5 p-4 space-y-3">
+              <p class="text-xs text-muted-foreground">
+                Si tu navegador bloqueó la apertura automática, usa el siguiente botón para abrir la pasarela de pago:
+              </p>
+              <div class="flex flex-col sm:flex-row gap-2">
+                <a hlmBtn variant="outline" size="sm" [href]="checkoutUrl" target="_blank" rel="noopener noreferrer"
+                  class="w-full sm:flex-1 gap-2">
+                  <ng-icon name="lucideExternalLink" />
+                  <span>Abrir Stripe Checkout</span>
+                </a>
+                <a hlmBtn variant="secondary" size="sm" routerLink="/orders" class="w-full sm:flex-1 gap-2">
+                  <span>Ver Mis Pedidos</span>
+                </a>
+              </div>
+            </div>
+            }
+          </div>
+        </hlm-tabs>
+      </div>
+    </section>
+  </div>
+</div>

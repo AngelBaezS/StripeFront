@@ -1,0 +1,280 @@
+<div class="mx-auto max-w-6xl space-y-6">
+  <!-- Encabezado -->
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <div class="flex items-center gap-2.5">
+        <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          Mis Pedidos y Compras
+        </h1>
+        @if (orders().length > 0) {
+        <span hlmBadge variant="secondary">
+          {{ orders().length }} {{ orders().length === 1 ? 'pedido' : 'pedidos' }}
+        </span>
+        }
+      </div>
+      <p class="text-sm text-muted-foreground mt-1">
+        Consulta el estado de tus compras pagadas y completa los pagos pendientes.
+      </p>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <a hlmBtn variant="outline" size="sm" routerLink="/cart" class="gap-1.5">
+        <ng-icon name="lucideShoppingCart" />
+        <span>Ir al Carrito</span>
+      </a>
+
+      <button hlmBtn variant="outline" size="sm" (click)="loadOrders()" [disabled]="isLoading()" class="gap-1.5">
+        <ng-icon name="lucideRefreshCw" [class.animate-spin]="isLoading()" />
+        <span>Actualizar</span>
+      </button>
+    </div>
+  </div>
+
+  @if (errorMessage()) {
+  <div hlmAlert variant="destructive">
+    <p hlmAlertDescription>{{ errorMessage() }}</p>
+  </div>
+  }
+
+  <!-- Pestañas de Filtrado -->
+  <div class="flex flex-wrap items-center gap-2 border-b border-border pb-3">
+    <button hlmBtn [variant]="activeTab() === 'all' ? 'default' : 'ghost'" size="sm" (click)="setTab('all')"
+      class="gap-2">
+      <span>Todos</span>
+      <span class="rounded-full bg-background/20 px-2 py-0.5 text-xs font-semibold">
+        {{ orders().length }}
+      </span>
+    </button>
+
+    <button hlmBtn [variant]="activeTab() === 'paid' ? 'default' : 'ghost'" size="sm" (click)="setTab('paid')"
+      class="gap-2 text-emerald-600 dark:text-emerald-400" [class.text-primary-foreground]="activeTab() === 'paid'">
+      <ng-icon name="lucideCheckCircle2" />
+      <span>Pagados</span>
+      <span class="rounded-full bg-background/20 px-2 py-0.5 text-xs font-semibold">
+        {{ paidOrders().length }}
+      </span>
+    </button>
+
+    <button hlmBtn [variant]="activeTab() === 'pending' ? 'default' : 'ghost'" size="sm" (click)="setTab('pending')"
+      class="gap-2 text-amber-600 dark:text-amber-500" [class.text-primary-foreground]="activeTab() === 'pending'">
+      <ng-icon name="lucideClock" />
+      <span>Pendientes de Pago</span>
+      <span class="rounded-full bg-background/20 px-2 py-0.5 text-xs font-semibold">
+        {{ pendingOrders().length }}
+      </span>
+    </button>
+
+    <button hlmBtn [variant]="activeTab() === 'canceled' ? 'default' : 'ghost'" size="sm" (click)="setTab('canceled')"
+      class="gap-2 text-destructive" [class.text-primary-foreground]="activeTab() === 'canceled'">
+      <ng-icon name="lucideXCircle" />
+      <span>Cancelados</span>
+      <span class="rounded-full bg-background/20 px-2 py-0.5 text-xs font-semibold">
+        {{ canceledOrders().length }}
+      </span>
+    </button>
+  </div>
+
+  <!-- Cargando pedidos -->
+  @if (isLoading() && orders().length === 0) {
+  <div class="space-y-4">
+    <div hlmCard class="border border-border">
+      <div hlmCardContent class="space-y-3 pt-6">
+        <hlm-skeleton class="h-6 w-1/4" />
+        <hlm-skeleton class="h-4 w-1/2" />
+        <hlm-skeleton class="h-12 w-full mt-4" />
+      </div>
+    </div>
+    <div hlmCard class="border border-border">
+      <div hlmCardContent class="space-y-3 pt-6">
+        <hlm-skeleton class="h-6 w-1/4" />
+        <hlm-skeleton class="h-4 w-1/2" />
+        <hlm-skeleton class="h-12 w-full mt-4" />
+      </div>
+    </div>
+  </div>
+  } @else if (filteredOrders().length === 0) {
+  <!-- Sin pedidos para el filtro actual -->
+  <div hlmEmpty class="border border-dashed border-border my-8">
+    <div hlmEmptyHeader>
+      <div class="flex size-14 items-center justify-center rounded-full bg-muted text-muted-foreground mb-2">
+        @if (activeTab() === 'paid') {
+        <ng-icon name="lucideCheckCircle2" class="text-2xl text-emerald-600" />
+        } @else if (activeTab() === 'pending') {
+        <ng-icon name="lucideClock" class="text-2xl text-amber-600" />
+        } @else if (activeTab() === 'canceled') {
+        <ng-icon name="lucideXCircle" class="text-2xl text-destructive" />
+        } @else {
+        <ng-icon name="lucidePackage" class="text-2xl" />
+        }
+      </div>
+      <h3 hlmEmptyTitle>
+        {{ activeTab() === 'paid' ? 'No tienes compras pagadas todavía' : activeTab() === 'pending' ? 'No tienes pagos
+        pendientes' : activeTab() === 'canceled' ? 'No tienes pedidos cancelados' : 'No tienes pedidos registrados' }}
+      </h3>
+      <p hlmEmptyDescription>
+        {{ activeTab() === 'paid' ? 'Cuando completes el pago de un carrito aparecerá registrado aquí con su
+        confirmación.' : activeTab() === 'pending' ? 'Todas tus órdenes están completadas o no tienes compras en
+        proceso.' : activeTab() === 'canceled' ? 'Las órdenes no pagadas dentro de 2 días se cancelarán automáticamente
+        y aparecerán aquí.' : 'Explora nuestro catálogo para agregar productos a tu carrito.' }}
+      </p>
+    </div>
+    <a hlmBtn routerLink="/products" class="gap-2 mt-2">
+      <ng-icon name="lucideShoppingBag" />
+      <span>Explorar Catálogo</span>
+    </a>
+  </div>
+  } @else {
+  <!-- Lista de Pedidos Filtrados -->
+  <div class="space-y-4">
+    @for (order of filteredOrders(); track order.id) {
+    <section hlmCard class="border border-border shadow-sm transition-all hover:shadow-md"
+      [class.border-emerald-500-20]="order.status === 'PAID'">
+      <div hlmCardHeader class="pb-1 border-b border-border/60">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="font-mono text-sm font-semibold text-foreground">
+                Orden: {{ order.id }}
+              </h3>
+
+              @if (order.status === 'PAID') {
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                <ng-icon name="lucideCheckCircle2" class="text-xs" />
+                <span>PAGADO</span>
+              </span>
+              } @else if (order.status === 'PENDING') {
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                <ng-icon name="lucideClock" class="text-xs" />
+                <span>PENDIENTE DE PAGO</span>
+              </span>
+              } @else if (order.status === 'CANCELED') {
+              <span hlmBadge variant="destructive" class="inline-flex items-center gap-1.5 text-xs">
+                <ng-icon name="lucideXCircle" class="text-xs" />
+                <span>CANCELADO</span>
+              </span>
+              } @else {
+              <span hlmBadge variant="destructive" class="text-xs">
+                {{ order.status }}
+              </span>
+              }
+            </div>
+            @if (order.createdAt) {
+            <p class="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <ng-icon name="lucideCalendar" class="text-xs" />
+              <span>Creada el {{ order.createdAt | date: 'dd/MM/yyyy, HH:mm' }}</span>
+            </p>
+            }
+            @if (order.status === 'CANCELED' && order.canceledAt) {
+            <p class="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-destructive">
+              <ng-icon name="lucideXCircle" class="text-xs" />
+              <span>Cancelado el {{ order.canceledAt | date: 'dd/MM/yyyy, HH:mm' }}</span>
+            </p>
+            } @else if (order.status === 'PENDING' && getOrderExpiresAt(order); as expiresAt) {
+            <p class="mt-0.5 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+              <ng-icon name="lucideClock" class="text-xs" />
+              <span>Límite de pago (48 h): {{ expiresAt | date: 'dd/MM/yyyy, HH:mm' }}</span>
+            </p>
+            }
+          </div>
+
+          <div class="text-left sm:text-right">
+            <span class="text-xs text-muted-foreground block">Monto Total</span>
+            <span class="text-lg font-bold text-foreground">
+              {{ order.totalAmountCents | centsToCurrency }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div hlmCardContent class="py-0 space-y-3">
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Artículos de la Compra ({{ order.items.length }})
+        </h4>
+
+        <div class="divide-y divide-border/40">
+          @for (item of order.items; track item.productId) {
+          <div class="py-2.5 flex items-center justify-between gap-4 text-sm first:pt-0 last:pb-0">
+            <div class="flex items-center gap-3 min-w-0">
+              @if (item.imageUrl) {
+              <img [src]="item.imageUrl" [alt]="item.productName"
+                class="size-10 object-contain rounded-md bg-muted/40 p-1 shrink-0" />
+              }
+              <div class="min-w-0">
+                <p class="font-medium text-foreground truncate">{{ item.productName }}</p>
+                <p class="text-xs text-muted-foreground">
+                  Cant: {{ item.quantity }} × {{ item.unitAmountCents | centsToCurrency }}
+                </p>
+              </div>
+            </div>
+
+            <span class="font-semibold text-foreground whitespace-nowrap">
+              {{ item.subtotalCents | centsToCurrency }}
+            </span>
+          </div>
+          }
+        </div>
+      </div>
+
+      <div hlmCardFooter
+        class="pt-3 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3 bg-muted/10">
+        <div class="text-xs text-muted-foreground">
+          @if (order.status === 'PAID') {
+          <span class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+            <ng-icon name="lucideCheckCircle2" class="text-sm" />
+            <span>Pago completado y confirmado.</span>
+          </span>
+          } @else if (order.status === 'PENDING') {
+          <span class="flex items-center gap-1.5 text-amber-600 dark:text-amber-500 font-medium">
+            <ng-icon name="lucideClock" class="text-sm" />
+            <span>Esta orden está reservada y se cancelará automáticamente si no se paga en 2 días.</span>
+          </span>
+          } @else if (order.status === 'CANCELED') {
+          <span class="flex items-center gap-1.5 text-destructive font-medium">
+            <ng-icon name="lucideXCircle" class="text-sm" />
+            <span>
+              Orden cancelada por falta de pago
+              @if (order.canceledAt) {
+              el {{ order.canceledAt | date: 'dd/MM/yyyy, HH:mm' }}
+              }.
+            </span>
+          </span>
+          }
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          @if (order.status === 'PENDING') {
+          <button hlmBtn variant="outline" size="sm" type="button" [disabled]="downloadingPdfOrderId() === order.id"
+            (click)="onDownloadSpeiPdf(order)" class="gap-1.5 w-full sm:w-auto text-xs">
+            <ng-icon name="lucideFileDown" />
+            <span>{{ downloadingPdfOrderId() === order.id ? 'Generando PDF...' : 'Descargar PDF SPEI' }}</span>
+          </button>
+          @if (isSpeiPaymentUrl(order.paymentUrl)) {
+          <a hlmBtn variant="outline" size="sm" [href]="order.paymentUrl" target="_blank" rel="noopener noreferrer"
+            class="gap-1.5 w-full sm:w-auto text-xs">
+            <ng-icon name="lucideExternalLink" />
+            <span>Ver Ficha SPEI</span>
+          </a>
+          }
+          <a hlmBtn size="sm" [routerLink]="['/cart/checkout']" [queryParams]="{ orderId: order.id }"
+            class="gap-1.5 w-full sm:w-auto font-semibold">
+            <ng-icon name="lucideCreditCard" />
+            <span>Completar Pago</span>
+          </a>
+          <app-cancel-order-dialog [orderId]="order.id" [isCanceling]="cancelingOrderId() === order.id"
+            (confirmed)="onCancelOrder(order.id, $event)" />
+          } @else if (order.status === 'PAID' || order.status === 'CANCELED') {
+          <button hlmBtn variant="outline" size="sm" (click)="onReorder(order)" [disabled]="isReordering()"
+            class="gap-1.5 w-full sm:w-auto text-xs">
+            <ng-icon name="lucideRepeat" />
+            <span>Comprar de nuevo</span>
+          </button>
+          }
+        </div>
+      </div>
+    </section>
+    }
+  </div>
+  }
+</div>
