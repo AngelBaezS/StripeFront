@@ -76,6 +76,93 @@
       }
       }
 
+      @if (status() === 'succeeded' && orderId(); as paidOrderId) {
+      <div class="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <ng-icon name="lucideFileText" class="text-primary shrink-0" />
+            <h3 class="text-sm font-semibold text-foreground">Facturación Electrónica (CFDI 4.0)</h3>
+          </div>
+          @if (invoiceSummary(); as inv) {
+            <span hlmBadge [variant]="inv.status === 'STAMPED' ? 'default' : 'secondary'" class="text-[11px]">
+              {{ inv.status }}
+            </span>
+          }
+        </div>
+
+        @if (invoiceSummary(); as inv) {
+          @if (inv.status === 'STAMPED') {
+          <p class="text-xs text-muted-foreground leading-relaxed">
+            Factura timbrada y enviada a <strong class="text-foreground">{{ inv.email }}</strong>.
+            <br />
+            UUID: <code class="font-mono text-foreground break-all">{{ inv.uuid || inv.cfdiExpressId }}</code>
+          </p>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <button hlmBtn variant="outline" size="sm" type="button" [disabled]="isDownloadingInvoiceFile()"
+              (click)="downloadInvoicePdf()" class="w-full sm:flex-1 gap-1.5 text-xs">
+              <ng-icon name="lucideFileDown" />
+              <span>Descargar PDF</span>
+            </button>
+            <button hlmBtn variant="outline" size="sm" type="button" [disabled]="isDownloadingInvoiceFile()"
+              (click)="downloadInvoiceXml()" class="w-full sm:flex-1 gap-1.5 text-xs">
+              <ng-icon name="lucideFileDown" />
+              <span>Descargar XML</span>
+            </button>
+            <button hlmBtn variant="outline" size="sm" type="button" [disabled]="isResendingInvoiceEmail()"
+              (click)="resendInvoiceEmail()" class="w-full sm:flex-1 gap-1.5 text-xs">
+              <ng-icon name="lucideMail" />
+              <span>{{ isResendingInvoiceEmail() ? 'Enviando...' : 'Reenviar Correo' }}</span>
+            </button>
+          </div>
+          } @else if (inv.status === 'PENDING_PAYMENT') {
+          <p class="text-xs text-muted-foreground leading-relaxed">
+            Datos fiscales registrados para RFC <strong class="font-mono text-foreground">{{ inv.rfc }}</strong>.
+            Si el webhook acaba de acreditarse, presiona actualizar o solicita el timbrado inmediato.
+          </p>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <button hlmBtn variant="outline" size="sm" type="button" [disabled]="isLoadingInvoice()"
+              (click)="loadInvoiceStatus(paidOrderId)" class="w-full sm:flex-1 gap-1.5 text-xs">
+              <ng-icon name="lucideRefreshCw" [class.animate-spin]="isLoadingInvoice()" />
+              <span>Actualizar Estado</span>
+            </button>
+            <app-issue-invoice-dialog
+              [orderId]="paidOrderId"
+              [initialInvoice]="inv"
+              triggerLabel="Emitir Factura Ahora"
+              triggerVariant="default"
+              triggerClass="w-full sm:flex-1 text-xs"
+              (issued)="onInvoiceIssued($event)"
+            />
+          </div>
+          } @else {
+          <p class="text-xs text-destructive leading-relaxed">
+            {{ inv.errorMessage || 'No se pudo completar el timbrado anterior. Puedes reintentar ahora.' }}
+          </p>
+          <app-issue-invoice-dialog
+            [orderId]="paidOrderId"
+            [initialInvoice]="inv"
+            triggerLabel="Reintentar Factura CFDI"
+            triggerVariant="default"
+            triggerClass="w-full text-xs"
+            (issued)="onInvoiceIssued($event)"
+          />
+          }
+        } @else {
+        <p class="text-xs text-muted-foreground leading-relaxed">
+          ¿Necesitas factura fiscal por esta compra? Captura tus datos fiscales para timbrarla al instante y enviarla a
+          tu correo.
+        </p>
+        <app-issue-invoice-dialog
+          [orderId]="paidOrderId"
+          triggerLabel="Solicitar Factura CFDI"
+          triggerVariant="outline"
+          triggerClass="w-full text-xs"
+          (issued)="onInvoiceIssued($event)"
+        />
+        }
+      </div>
+      }
+
       @if (status() === 'processing' || status() === 'requires_action') {
       @if (isLoadingSpeiDetails()) {
       <div
@@ -162,9 +249,6 @@
           class="w-full sm:w-auto gap-2">
           <ng-icon name="lucideShoppingBag" />
           <span>Volver a la Tienda</span>
-        </a>
-        <a hlmBtn variant="outline" routerLink="/cart" class="w-full sm:w-auto">
-          Ir al Carrito
         </a>
       </div>
     </div>

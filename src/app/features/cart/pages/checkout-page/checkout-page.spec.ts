@@ -6,6 +6,7 @@ import { CheckoutPage } from './checkout-page';
 import { CartService } from '@features/cart/services/cart.service';
 import { CheckoutService } from '@core/services/checkout.service';
 import { AuthService } from '@core/services/auth.service';
+import { InvoiceService } from '@core/services/invoice.service';
 import { StripePaymentResult } from '@shared/models/order.model';
 
 describe('CheckoutPage', () => {
@@ -94,6 +95,13 @@ describe('CheckoutPage', () => {
         { provide: CartService, useValue: cartServiceMock },
         { provide: CheckoutService, useValue: checkoutServiceMock },
         { provide: AuthService, useValue: authServiceMock },
+        {
+          provide: InvoiceService,
+          useValue: {
+            saveCheckoutInvoiceRequest: vi.fn().mockReturnValue(of(null)),
+            saveOrderDraft: vi.fn(),
+          },
+        },
       ],
     }).compileComponents();
 
@@ -264,6 +272,13 @@ describe('CheckoutPage', () => {
         { provide: CartService, useValue: cartServiceMock },
         { provide: CheckoutService, useValue: checkoutServiceMock },
         { provide: AuthService, useValue: authServiceMock },
+        {
+          provide: InvoiceService,
+          useValue: {
+            saveCheckoutInvoiceRequest: vi.fn().mockReturnValue(of(null)),
+            saveOrderDraft: vi.fn(),
+          },
+        },
       ],
     }).compileComponents();
 
@@ -436,6 +451,13 @@ describe('CheckoutPage', () => {
         { provide: CartService, useValue: cartServiceMock },
         { provide: CheckoutService, useValue: checkoutServiceMock },
         { provide: AuthService, useValue: authServiceMock },
+        {
+          provide: InvoiceService,
+          useValue: {
+            saveCheckoutInvoiceRequest: vi.fn().mockReturnValue(of(null)),
+            saveOrderDraft: vi.fn(),
+          },
+        },
       ],
     }).compileComponents();
 
@@ -573,6 +595,13 @@ describe('CheckoutPage', () => {
         { provide: CartService, useValue: cartServiceMock },
         { provide: CheckoutService, useValue: checkoutServiceMock },
         { provide: AuthService, useValue: authServiceMock },
+        {
+          provide: InvoiceService,
+          useValue: {
+            saveCheckoutInvoiceRequest: vi.fn().mockReturnValue(of(null)),
+            saveOrderDraft: vi.fn(),
+          },
+        },
       ],
     }).compileComponents();
 
@@ -697,6 +726,13 @@ describe('CheckoutPage', () => {
         { provide: CartService, useValue: cartServiceMock },
         { provide: CheckoutService, useValue: checkoutServiceMock },
         { provide: AuthService, useValue: authServiceMock },
+        {
+          provide: InvoiceService,
+          useValue: {
+            saveCheckoutInvoiceRequest: vi.fn().mockReturnValue(of(null)),
+            saveOrderDraft: vi.fn(),
+          },
+        },
       ],
     }).compileComponents();
 
@@ -722,6 +758,140 @@ describe('CheckoutPage', () => {
 
       expect(checkoutServiceMock.createOrGetOrderPaymentLink).toHaveBeenCalledWith('ord_hosted_1');
       expect(mockPopup.location.href).toBe('https://checkout.stripe.com/c/pay/cs_hosted_2');
+    } finally {
+      windowOpenSpy.mockRestore();
+    }
+  });
+
+  it('should require valid fiscal fields when requiresInvoice is enabled and save invoice request for Stripe Checkout order', async () => {
+    const cartServiceMock = {
+      getCart: vi.fn().mockReturnValue(
+        of({
+          id: 'crt_cfdi_1',
+          userId: 'usr_1',
+          status: 'ACTIVE',
+          totalAmountCents: 150000,
+          items: [
+            {
+              id: 'cit_1',
+              productId: 'prd_1',
+              productName: 'Monitor 4K',
+              unitAmountCents: 150000,
+              quantity: 1,
+              subtotalCents: 150000,
+            },
+          ],
+        })
+      ),
+      resetLocalState: vi.fn(),
+    };
+
+    const checkoutServiceMock = {
+      getStripe: vi.fn().mockResolvedValue(null),
+      getUserOrders: vi.fn().mockReturnValue(of([])),
+      createPaymentLinkOrder: vi.fn().mockReturnValue(
+        of({
+          stripeId: 'cs_cfdi_hosted_1',
+          clientSecret: null,
+          paymentUrl: 'https://checkout.stripe.com/c/pay/cs_cfdi_hosted_1',
+          status: 'PENDING',
+          orderId: 'ord_cfdi_checkout_1',
+        })
+      ),
+    };
+
+    const invoiceServiceMock = {
+      saveCheckoutInvoiceRequest: vi.fn().mockReturnValue(
+        of({
+          id: 'invo_1',
+          orderId: 'ord_cfdi_checkout_1',
+          status: 'PENDING_PAYMENT',
+          rfc: 'XIA190128J61',
+          legalName: 'XENON INDUSTRIAL SA',
+          zipCode: '01160',
+          taxRegime: '601',
+          cfdiUse: 'G03',
+          email: 'facturas@xenon.mx',
+          hasPdf: false,
+          hasXml: false,
+        })
+      ),
+      saveOrderDraft: vi.fn(),
+    };
+
+    const authServiceMock = {
+      currentProfile: vi.fn().mockReturnValue({ email: 'cliente@correo.mx' }),
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      getProfile: vi.fn().mockReturnValue(of({ email: 'cliente@correo.mx' })),
+    };
+
+    await TestBed.configureTestingModule({
+      imports: [CheckoutPage],
+      providers: [
+        provideRouter([]),
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              queryParamMap: {
+                get: () => null,
+              },
+            },
+          },
+        },
+        { provide: CartService, useValue: cartServiceMock },
+        { provide: CheckoutService, useValue: checkoutServiceMock },
+        { provide: AuthService, useValue: authServiceMock },
+        { provide: InvoiceService, useValue: invoiceServiceMock },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CheckoutPage);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+
+    component.onToggleRequiresInvoice(true);
+    fixture.detectChanges();
+
+    // Si faltan datos fiscales obligatorios, bloquea la llamada a Stripe
+    component.redirectToPaymentLink();
+    expect(checkoutServiceMock.createPaymentLinkOrder).not.toHaveBeenCalled();
+
+    component.invoiceForm.setValue({
+      rfc: 'XIA190128J61',
+      legalName: 'Xenon Industrial SA',
+      zipCode: '01160',
+      taxRegime: '601',
+      cfdiUse: 'G03',
+      email: 'facturas@xenon.mx',
+    });
+
+    const mockPopup = {
+      opener: {} as unknown,
+      closed: false,
+      location: { href: '' },
+      document: { title: '', body: { innerHTML: '' } },
+      close: vi.fn(),
+    };
+    const windowOpenSpy = vi
+      .spyOn(window, 'open')
+      .mockReturnValue(mockPopup as unknown as Window);
+
+    try {
+      component.redirectToPaymentLink();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(checkoutServiceMock.createPaymentLinkOrder).toHaveBeenCalled();
+      expect(invoiceServiceMock.saveOrderDraft).toHaveBeenCalledWith(
+        'ord_cfdi_checkout_1',
+        expect.objectContaining({ rfc: 'XIA190128J61' })
+      );
+      expect(invoiceServiceMock.saveCheckoutInvoiceRequest).toHaveBeenCalledWith(
+        'ord_cfdi_checkout_1',
+        expect.objectContaining({ rfc: 'XIA190128J61' })
+      );
+      expect(component.invoiceRegistered()?.status).toBe('PENDING_PAYMENT');
     } finally {
       windowOpenSpy.mockRestore();
     }

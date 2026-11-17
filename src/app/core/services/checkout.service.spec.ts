@@ -21,7 +21,7 @@ describe('CheckoutService', () => {
     httpMock.verify();
   });
 
-  it('should get user orders list', () => {
+  it('should get user orders list from paginated endpoint', () => {
     const mockOrders = [
       {
         id: 'ord_123',
@@ -37,9 +37,56 @@ describe('CheckoutService', () => {
       expect(orders).toEqual(mockOrders);
     });
 
-    const req = httpMock.expectOne(`${environment.apiUrl}/api/v1/order`);
+    const req = httpMock.expectOne(`${environment.apiUrl}/api/v1/order?page=0&size=100`);
     expect(req.request.method).toBe('GET');
-    req.flush(mockOrders);
+    req.flush({
+      content: mockOrders,
+      page: 0,
+      size: 100,
+      totalElements: 1,
+      totalPages: 1,
+      hasNext: false,
+      hasPrevious: false,
+      totalAll: 1,
+      totalPaid: 0,
+      totalPending: 1,
+      totalCanceled: 0,
+    });
+  });
+
+  it('should get paginated user orders with page, size and status params', () => {
+    const mockPage = {
+      content: [
+        {
+          id: 'ord_stripe_11',
+          userId: 'usr_1',
+          totalAmountCents: 75000,
+          currency: 'mxn',
+          status: 'PAID' as const,
+          items: [],
+        },
+      ],
+      page: 1,
+      size: 10,
+      totalElements: 11,
+      totalPages: 2,
+      hasNext: false,
+      hasPrevious: true,
+      totalAll: 15,
+      totalPaid: 11,
+      totalPending: 2,
+      totalCanceled: 2,
+    };
+
+    service.getUserOrdersPage(1, 10, 'PAID').subscribe((page) => {
+      expect(page).toEqual(mockPage);
+    });
+
+    const req = httpMock.expectOne(
+      `${environment.apiUrl}/api/v1/order?page=1&size=10&status=PAID`
+    );
+    expect(req.request.method).toBe('GET');
+    req.flush(mockPage);
   });
 
   it('should get or retry order payment for specific orderId', () => {
@@ -177,6 +224,28 @@ describe('CheckoutService', () => {
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toBeNull();
     req.flush(canceledOrder);
+  });
+
+  it('should call POST order/{orderId}/sync-payment with sessionId query param', () => {
+    const paidOrder = {
+      id: 'ord_sync_1',
+      userId: 'usr_1',
+      totalAmountCents: 16931,
+      currency: 'mxn',
+      status: 'PAID' as const,
+      items: [],
+    };
+
+    service.syncOrderPaymentStatus('ord_sync_1', 'cs_test_abc').subscribe((res) => {
+      expect(res.status).toBe('PAID');
+      expect(res.id).toBe('ord_sync_1');
+    });
+
+    const req = httpMock.expectOne(
+      `${environment.apiUrl}/api/v1/order/ord_sync_1/sync-payment?sessionId=cs_test_abc`
+    );
+    expect(req.request.method).toBe('POST');
+    req.flush(paidOrder);
   });
 });
 

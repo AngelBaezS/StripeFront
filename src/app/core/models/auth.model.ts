@@ -32,7 +32,7 @@ export interface AuthResponse {
 }
 
 export interface RefreshTokenResponse {
-  token: string;
+  token?: string | null;
   role: UserRole;
   expiresAt: string;
   refreshed: boolean;
@@ -44,7 +44,7 @@ export interface UpdateUsernameRequest {
 
 export interface UpdateUsernameResponse {
   profile: UserProfileResponse;
-  token: string;
+  token?: string | null;
 }
 
 export interface UpdatePasswordRequest {

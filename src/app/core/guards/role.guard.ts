@@ -10,11 +10,7 @@ export const roleGuard = (...allowedRoles: UserRole[]): CanActivateFn => {
     const authService = inject(AuthService);
     const router = inject(Router);
 
-    if (!authService.isAuthenticated()) {
-      return router.createUrlTree(['/auth/login']);
-    }
-
-    // Valida siempre el rol real en el servidor (/api/v1/auth/me) usando el JWT firmado
+    // Valida siempre la sesión y el rol real en el servidor (/api/v1/auth/me) usando la cookie HttpOnly
     return authService.getProfile().pipe(
       map((profile) => {
         if (profile?.role && allowedRoles.includes(profile.role)) {
@@ -25,7 +21,7 @@ export const roleGuard = (...allowedRoles: UserRole[]): CanActivateFn => {
       }),
       catchError((err) => {
         if (err?.status === 401 || err?.status === 403) {
-          authService.logout();
+          authService.logout(false);
           return of(router.createUrlTree(['/auth/login']));
         }
         toast.error('No se pudo verificar tu rol de acceso.');

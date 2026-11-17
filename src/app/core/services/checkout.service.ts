@@ -1,9 +1,14 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Observable, map } from 'rxjs';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { environment } from '@env/environment';
-import { OrderDetail, StripePaymentResult } from '@shared/models/order.model';
+import {
+  OrderDetail,
+  OrderPageResponse,
+  OrderStatus,
+  StripePaymentResult,
+} from '@shared/models/order.model';
 
 @Injectable({
   providedIn: 'root',
@@ -21,10 +26,29 @@ export class CheckoutService {
   }
 
   /**
+   * Obtiene de forma paginada las órdenes vinculadas a Stripe del usuario autenticado.
+   */
+  public getUserOrdersPage(
+    page = 0,
+    size = 10,
+    status?: OrderStatus
+  ): Observable<OrderPageResponse> {
+    let params = new HttpParams()
+      .set('page', String(page))
+      .set('size', String(size));
+    if (status) {
+      params = params.set('status', status);
+    }
+    return this.http.get<OrderPageResponse>(this.orderApiUrl, { params });
+  }
+
+  /**
    * Obtiene la lista de órdenes/compras históricas del usuario autenticado.
    */
   public getUserOrders(): Observable<OrderDetail[]> {
-    return this.http.get<OrderDetail[]>(this.orderApiUrl);
+    return this.getUserOrdersPage(0, 100).pipe(
+      map((res) => (Array.isArray(res) ? res : (res?.content ?? [])))
+    );
   }
 
   /**
@@ -85,6 +109,19 @@ export class CheckoutService {
     return this.http.get(`${this.orderApiUrl}/${orderId}/spei-pdf`, {
       responseType: 'blob',
     });
+  }
+
+  /**
+   * POST /api/v1/order/{orderId}/sync-payment
+   * Verifica en Stripe el estado real del pago y sincroniza la orden a PAID si ya fue acreditada
+   * (respaldo inmediato si el webhook local aún no llega).
+   */
+  public syncOrderPaymentStatus(orderId: string, sessionId?: string | null): Observable<OrderDetail> {
+    let params = new HttpParams();
+    if (sessionId && sessionId.trim().length > 0) {
+      params = params.set('sessionId', sessionId.trim());
+    }
+    return this.http.post<OrderDetail>(`${this.orderApiUrl}/${orderId}/sync-payment`, null, { params });
   }
 
   /**

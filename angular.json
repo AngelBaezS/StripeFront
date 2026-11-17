@@ -60,6 +60,19 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "proxyConfig": "proxy.conf.json",
+            "allowedHosts": [
+              ".trycloudflare.com",
+              ".lhr.life",
+              ".localhost.run",
+              ".ngrok-free.app",
+              ".ngrok-free.dev",
+              ".ngrok.io",
+              ".devtunnels.ms",
+              ".loca.lt"
+            ]
+          },
           "configurations": {
             "production": {
               "buildTarget": "payment-stripe-front:build:production"

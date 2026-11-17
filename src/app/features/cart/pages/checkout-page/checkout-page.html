@@ -221,6 +221,45 @@
       </div>
 
       <div hlmCardContent class="space-y-6">
+        <!-- SECCIÓN DE FACTURACIÓN ELECTRÓNICA (OPCIONAL AL REALIZAR LA COMPRA) -->
+        <div class="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+          <div class="flex items-start gap-3">
+            <hlm-checkbox
+              inputId="requireInvoiceCheck"
+              [checked]="requiresInvoice()"
+              (checkedChange)="onToggleRequiresInvoice($event)"
+              class="mt-0.5"
+            />
+            <div class="space-y-1 flex-1">
+              <label for="requireInvoiceCheck"
+                class="text-sm font-semibold text-foreground flex items-center gap-2 cursor-pointer">
+                <ng-icon name="lucideFileText" class="text-primary" />
+                <span>Requiero factura electrónica (CFDI 4.0)</span>
+              </label>
+              <p class="text-xs text-muted-foreground">
+                Marca esta casilla para capturar tus datos fiscales. Tu factura se timbrará en CFDI Express y se enviará
+                en PDF y XML a tu correo al confirmarse el pago.
+              </p>
+            </div>
+          </div>
+
+          @if (requiresInvoice()) {
+          <div class="pt-2 border-t border-border/60 space-y-3">
+            <app-invoice-fiscal-fields [form]="invoiceForm" idPrefix="checkout" />
+            @if (invoiceRegistered(); as reg) {
+            <div
+              class="rounded-md border border-emerald-500/25 bg-emerald-500/10 p-2.5 text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+              <ng-icon name="lucideCheck" class="shrink-0" />
+              <span>
+                Datos fiscales registrados para RFC <strong class="font-mono">{{ reg.rfc }}</strong> (se timbrará al
+                confirmar el pago).
+              </span>
+            </div>
+            }
+          </div>
+          }
+        </div>
+
         <hlm-tabs [tab]="speiResult() || mountedElementsMode() === 'spei' ? 'spei' : 'direct'" class="w-full">
           <hlm-tabs-list class="grid w-full grid-cols-3" aria-label="Modalidades de Pago">
             <button hlmTabsTrigger="direct"

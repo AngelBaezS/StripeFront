@@ -6,9 +6,9 @@
         <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
           Mis Pedidos y Compras
         </h1>
-        @if (orders().length > 0) {
+        @if (totalAll() > 0) {
         <span hlmBadge variant="secondary">
-          {{ orders().length }} {{ orders().length === 1 ? 'pedido' : 'pedidos' }}
+          {{ totalAll() }} {{ totalAll() === 1 ? 'pedido' : 'pedidos' }}
         </span>
         }
       </div>
@@ -42,7 +42,7 @@
       class="gap-2">
       <span>Todos</span>
       <span class="rounded-full bg-background/20 px-2 py-0.5 text-xs font-semibold">
-        {{ orders().length }}
+        {{ totalAll() }}
       </span>
     </button>
 
@@ -51,7 +51,7 @@
       <ng-icon name="lucideCheckCircle2" />
       <span>Pagados</span>
       <span class="rounded-full bg-background/20 px-2 py-0.5 text-xs font-semibold">
-        {{ paidOrders().length }}
+        {{ totalPaid() }}
       </span>
     </button>
 
@@ -60,7 +60,7 @@
       <ng-icon name="lucideClock" />
       <span>Pendientes de Pago</span>
       <span class="rounded-full bg-background/20 px-2 py-0.5 text-xs font-semibold">
-        {{ pendingOrders().length }}
+        {{ totalPending() }}
       </span>
     </button>
 
@@ -69,7 +69,7 @@
       <ng-icon name="lucideXCircle" />
       <span>Cancelados</span>
       <span class="rounded-full bg-background/20 px-2 py-0.5 text-xs font-semibold">
-        {{ canceledOrders().length }}
+        {{ totalCanceled() }}
       </span>
     </button>
   </div>
@@ -219,17 +219,45 @@
 
       <div hlmCardFooter
         class="pt-3 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3 bg-muted/10">
-        <div class="text-xs text-muted-foreground">
+        <div class="text-xs text-muted-foreground space-y-1">
           @if (order.status === 'PAID') {
           <span class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
             <ng-icon name="lucideCheckCircle2" class="text-sm" />
             <span>Pago completado y confirmado.</span>
           </span>
+          @if (order.invoice; as inv) {
+          @if (inv.status === 'STAMPED') {
+          <span class="flex items-center gap-1.5 text-foreground font-medium">
+            <ng-icon name="lucideFileText" class="text-sm text-primary" />
+            <span>
+              Factura Emitida
+            </span>
+          </span>
+          } @else if (inv.status === 'PENDING_PAYMENT') {
+          <span class="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-medium">
+            <ng-icon name="lucideFileText" class="text-sm" />
+            <span>Solicitud de factura registrada ({{ inv.rfc }}) · lista para timbrado.</span>
+          </span>
+          } @else if (inv.status === 'FAILED') {
+          <span class="flex items-center gap-1.5 text-destructive font-medium">
+            <ng-icon name="lucideFileText" class="text-sm" />
+            <span>Error al timbrar factura: {{ inv.errorMessage || 'Revisa tus datos fiscales o configuración de
+              emisor.' }}</span>
+          </span>
+          }
+          }
           } @else if (order.status === 'PENDING') {
           <span class="flex items-center gap-1.5 text-amber-600 dark:text-amber-500 font-medium">
             <ng-icon name="lucideClock" class="text-sm" />
             <span>Esta orden está reservada y se cancelará automáticamente si no se paga en 2 días.</span>
           </span>
+          @if (order.invoice?.status === 'PENDING_PAYMENT') {
+          <span class="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-medium">
+            <ng-icon name="lucideFileText" class="text-sm" />
+            <span>Factura CFDI solicitada ({{ order.invoice?.rfc }}) — se emitirá automáticamente al acreditarse el
+              pago.</span>
+          </span>
+          }
           } @else if (order.status === 'CANCELED') {
           <span class="flex items-center gap-1.5 text-destructive font-medium">
             <ng-icon name="lucideXCircle" class="text-sm" />
@@ -264,7 +292,34 @@
           </a>
           <app-cancel-order-dialog [orderId]="order.id" [isCanceling]="cancelingOrderId() === order.id"
             (confirmed)="onCancelOrder(order.id, $event)" />
-          } @else if (order.status === 'PAID' || order.status === 'CANCELED') {
+          } @else if (order.status === 'PAID') {
+          @if (order.invoice?.status === 'STAMPED') {
+          <button hlmBtn variant="outline" size="sm" type="button" [disabled]="downloadingInvoiceOrderId() === order.id"
+            (click)="onDownloadInvoicePdf(order)" class="gap-1.5 w-full sm:w-auto text-xs">
+            <ng-icon name="lucideFileDown" />
+            <span>Factura PDF</span>
+          </button>
+          <button hlmBtn variant="outline" size="sm" type="button" [disabled]="downloadingInvoiceOrderId() === order.id"
+            (click)="onDownloadInvoiceXml(order)" class="gap-1.5 w-full sm:w-auto text-xs">
+            <ng-icon name="lucideFileDown" />
+            <span>Factura XML</span>
+          </button>
+          <button hlmBtn variant="outline" size="sm" type="button" [disabled]="resendingInvoiceOrderId() === order.id"
+            (click)="onResendInvoiceEmail(order)" class="gap-1.5 w-full sm:w-auto text-xs">
+            <ng-icon name="lucideMail" />
+            <span>{{ resendingInvoiceOrderId() === order.id ? 'Enviando...' : 'Reenviar Correo' }}</span>
+          </button>
+          } @else {
+          <app-issue-invoice-dialog [orderId]="order.id" [initialInvoice]="order.invoice ?? null"
+            [triggerLabel]="order.invoice?.status === 'FAILED' ? 'Reintentar Factura CFDI' : 'Solicitar Factura CFDI'"
+            (issued)="onInvoiceIssued(order.id, $event)" />
+          }
+          <button hlmBtn variant="outline" size="sm" (click)="onReorder(order)" [disabled]="isReordering()"
+            class="gap-1.5 w-full sm:w-auto text-xs">
+            <ng-icon name="lucideRepeat" />
+            <span>Comprar de nuevo</span>
+          </button>
+          } @else if (order.status === 'CANCELED') {
           <button hlmBtn variant="outline" size="sm" (click)="onReorder(order)" [disabled]="isReordering()"
             class="gap-1.5 w-full sm:w-auto text-xs">
             <ng-icon name="lucideRepeat" />
@@ -276,5 +331,43 @@
     </section>
     }
   </div>
+
+  @if (totalPages() > 1) {
+  <div class="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+    <p class="text-sm text-muted-foreground">
+      Mostrando {{ rangeStart() }} - {{ rangeEnd() }} de {{ totalElements() }} pedidos (Página {{ currentPage() }} de {{
+      totalPages() }})
+    </p>
+
+    <nav hlmPagination aria-label="Paginación de pedidos" class="mx-0 w-auto">
+      <ul hlmPaginationContent>
+        <li hlmPaginationItem>
+          <hlm-pagination-previous text="Anterior" aria-label="Ir a la página anterior"
+            [class.pointer-events-none]="!hasPrevious() || isLoading()"
+            [class.opacity-50]="!hasPrevious() || isLoading()" [attr.aria-disabled]="!hasPrevious() || isLoading()"
+            (click)="previousPage()" />
+        </li>
+
+        @for (item of visiblePages(); track $index) {
+        <li hlmPaginationItem>
+          @if (item === 'ellipsis') {
+          <hlm-pagination-ellipsis srOnlyText="Más páginas" />
+          } @else {
+          <a hlmPaginationLink [isActive]="currentPage() === item" (click)="goToPage(item)">
+            {{ item }}
+          </a>
+          }
+        </li>
+        }
+
+        <li hlmPaginationItem>
+          <hlm-pagination-next text="Siguiente" aria-label="Ir a la página siguiente"
+            [class.pointer-events-none]="!hasNext() || isLoading()" [class.opacity-50]="!hasNext() || isLoading()"
+            [attr.aria-disabled]="!hasNext() || isLoading()" (click)="nextPage()" />
+        </li>
+      </ul>
+    </nav>
+  </div>
+  }
   }
 </div>

@@ -1,3 +1,5 @@
+import { InvoiceSummary } from '@shared/models/invoice.model';
+
 export type OrderStatus = 'PENDING' | 'PAID' | 'FAILED' | 'CANCELED';
 
 export interface SpeiPaymentDetails {
@@ -44,6 +46,21 @@ export interface OrderDetail {
   expiresAt?: string;
   canceledAt?: string;
   items: OrderItemDetail[];
+  invoice?: InvoiceSummary | null;
+}
+
+export interface OrderPageResponse {
+  content: OrderDetail[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+  totalAll: number;
+  totalPaid: number;
+  totalPending: number;
+  totalCanceled: number;
 }
 
 export interface ApiErrorResponse {

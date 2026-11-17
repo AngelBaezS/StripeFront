@@ -3,6 +3,8 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 import { CheckoutService } from '@core/services/checkout.service';
+import { InvoiceService } from '@core/services/invoice.service';
+import { AuthService } from '@core/services/auth.service';
 import { StripePaymentResult } from '@shared/models/order.model';
 import { PaymentStatusPage } from './payment-status-page';
 import { CartService } from '@features/cart/services/cart.service';
@@ -37,6 +39,19 @@ describe('PaymentStatusPage', () => {
         },
         { provide: CartService, useValue: cartServiceMock },
         { provide: CheckoutService, useValue: checkoutServiceMock },
+        {
+          provide: InvoiceService,
+          useValue: {
+            getInvoiceForOrder: vi.fn().mockReturnValue(of(null)),
+            clearOrderDraft: vi.fn(),
+            downloadInvoicePdf: vi.fn(),
+            downloadInvoiceXml: vi.fn(),
+          },
+        },
+        {
+          provide: AuthService,
+          useValue: { currentProfile: vi.fn().mockReturnValue({ email: 'a@b.mx' }) },
+        },
       ],
     }).compileComponents();
 
@@ -104,6 +119,19 @@ describe('PaymentStatusPage', () => {
         },
         { provide: CartService, useValue: cartServiceMock },
         { provide: CheckoutService, useValue: checkoutServiceMock },
+        {
+          provide: InvoiceService,
+          useValue: {
+            getInvoiceForOrder: vi.fn().mockReturnValue(of(null)),
+            clearOrderDraft: vi.fn(),
+            downloadInvoicePdf: vi.fn(),
+            downloadInvoiceXml: vi.fn(),
+          },
+        },
+        {
+          provide: AuthService,
+          useValue: { currentProfile: vi.fn().mockReturnValue({ email: 'a@b.mx' }) },
+        },
       ],
     }).compileComponents();
 
@@ -128,5 +156,85 @@ describe('PaymentStatusPage', () => {
       pdfBlob,
       'ficha-spei-ord_spei_return_1.pdf'
     );
+  });
+
+  it('should sync payment status on return from Stripe and render stamped invoice', async () => {
+    const cartServiceMock = {
+      resetLocalState: vi.fn(),
+      getCart: vi.fn().mockReturnValue(of(null)),
+    };
+    const syncedOrder = {
+      id: 'ord_sync_cfdi_1',
+      userId: 'usr_1',
+      totalAmountCents: 16931,
+      currency: 'mxn',
+      status: 'PAID' as const,
+      items: [],
+      invoice: {
+        id: 'invo_1',
+        orderId: 'ord_sync_cfdi_1',
+        status: 'STAMPED' as const,
+        cfdiExpressId: 'cfdi_1',
+        uuid: 'UUID-STAMPED-SYNC',
+        rfc: 'CACX7605101P8',
+        legalName: 'XOCHILT CASAS CHAVEZ',
+        zipCode: '36257',
+        taxRegime: '612',
+        cfdiUse: 'G03',
+        email: 'angelbaezs1512@gmail.com',
+        hasPdf: true,
+        hasXml: true,
+      },
+    };
+    const checkoutServiceMock = {
+      syncOrderPaymentStatus: vi.fn().mockReturnValue(of(syncedOrder)),
+      getUserOrders: vi.fn().mockReturnValue(of([syncedOrder])),
+      createOrGetOrderSpeiPayment: vi.fn(),
+      downloadOrderSpeiPdf: vi.fn(),
+      saveBlobAsFile: vi.fn(),
+    };
+    const invoiceServiceMock = {
+      getInvoiceForOrder: vi.fn().mockReturnValue(of(syncedOrder.invoice)),
+      clearOrderDraft: vi.fn(),
+      downloadInvoicePdf: vi.fn(),
+      downloadInvoiceXml: vi.fn(),
+    };
+
+    await TestBed.configureTestingModule({
+      imports: [PaymentStatusPage],
+      providers: [
+        provideRouter([]),
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              queryParamMap: convertToParamMap({
+                session_id: 'cs_test_sync_1',
+                order_id: 'ord_sync_cfdi_1',
+              }),
+            },
+          },
+        },
+        { provide: CartService, useValue: cartServiceMock },
+        { provide: CheckoutService, useValue: checkoutServiceMock },
+        { provide: InvoiceService, useValue: invoiceServiceMock },
+        {
+          provide: AuthService,
+          useValue: { currentProfile: vi.fn().mockReturnValue({ email: 'a@b.mx' }) },
+        },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(PaymentStatusPage);
+    fixture.detectChanges();
+
+    const component = fixture.componentInstance;
+    expect(checkoutServiceMock.syncOrderPaymentStatus).toHaveBeenCalledWith(
+      'ord_sync_cfdi_1',
+      'cs_test_sync_1'
+    );
+    expect(component.status()).toBe('succeeded');
+    expect(component.invoiceSummary()?.uuid).toBe('UUID-STAMPED-SYNC');
+    expect(invoiceServiceMock.clearOrderDraft).toHaveBeenCalledWith('ord_sync_cfdi_1');
   });
 });

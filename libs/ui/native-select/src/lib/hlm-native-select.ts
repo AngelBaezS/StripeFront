@@ -4,11 +4,14 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
+  type ElementRef,
   forwardRef,
   inject,
   input,
   linkedSignal,
   output,
+  viewChild,
 } from '@angular/core';
 import { NG_VALUE_ACCESSOR, type ControlValueAccessor } from '@angular/forms';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -40,6 +43,7 @@ export const HLM_NATIVE_SELECT_VALUE_ACCESSOR = {
   },
   template: `
     <select
+      #selectEl
       data-slot="native-select"
       [id]="selectId()"
       [class]="_computedSelectClass()"
@@ -126,8 +130,21 @@ export class HlmNativeSelect implements ControlValueAccessor {
     () => this.forceInvalid() || this._fieldControl?.spartanInvalid(),
   );
 
+  private readonly _selectEl = viewChild<ElementRef<HTMLSelectElement>>('selectEl');
+
   constructor() {
     classes(() => 'group/native-select relative w-fit has-[select:disabled]:opacity-50');
+    effect(() => {
+      const targetValue = this.value() ?? '';
+      const select = this._selectEl()?.nativeElement;
+      if (select && select.value !== targetValue) {
+        queueMicrotask(() => {
+          if (select.value !== targetValue) {
+            select.value = targetValue;
+          }
+        });
+      }
+    });
   }
 
   protected _valueChanged(event: Event): void {

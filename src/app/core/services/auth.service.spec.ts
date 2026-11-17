@@ -13,22 +13,20 @@ import { vi } from 'vitest';
 import { toast } from '@spartan-ng/brain/sonner';
 import { AuthService } from './auth.service';
 import { authInterceptor } from '../interceptors/auth.interceptor';
+import { authGuard, guestGuard } from '../guards/auth.guard';
 import { roleGuard } from '../guards/role.guard';
 import { environment } from '@env/environment';
 
-function createFakeJwt(payload: Record<string, unknown>): string {
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const body = btoa(JSON.stringify(payload));
-  return `${header}.${body}.signature`;
-}
-
-describe('AuthService & roleGuard (Roles & Security)', () => {
+describe('AuthService, Guards & Interceptor (HttpOnly Cookie Security)', () => {
   let service: AuthService;
   let httpMock: HttpTestingController;
   let router: Router;
 
   beforeEach(() => {
     localStorage.clear();
+    localStorage.setItem('auth_token', 'legacy_token_should_be_cleared');
+    localStorage.setItem('auth_role', 'ADMIN');
+
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([authInterceptor])),
@@ -36,6 +34,7 @@ describe('AuthService & roleGuard (Roles & Security)', () => {
         provideRouter([
           { path: 'auth/login', children: [] },
           { path: 'products', children: [] },
+          { path: 'admin/products', children: [] },
         ]),
       ],
     });
@@ -51,21 +50,26 @@ describe('AuthService & roleGuard (Roles & Security)', () => {
     vi.restoreAllMocks();
   });
 
-  it('should extract role from JWT and /me profile without persisting auth_role in localStorage', () => {
-    const fakeToken = createFakeJwt({ sub: 'angel', role: 'ADMIN' });
+  it('should clear legacy localStorage keys, login with withCredentials, and rely on /me without storing JWT locally', () => {
+    expect(localStorage.getItem('auth_token')).toBeNull();
+    expect(localStorage.getItem('auth_role')).toBeNull();
 
-    service.login({ username: 'angel', password: 'Password123!' }).subscribe((token) => {
-      expect(token).toBe(fakeToken);
-    });
+    service.login({ username: 'angel', password: 'Password123!' }).subscribe();
 
     const loginReq = httpMock.expectOne(`${environment.apiUrl}/api/v1/auth/login`);
     expect(loginReq.request.method).toBe('POST');
-    loginReq.flush(fakeToken, {
-      headers: { 'X-User-Role': 'ADMIN' },
+    expect(loginReq.request.withCredentials).toBe(true);
+    expect(loginReq.request.headers.has('Authorization')).toBe(false);
+    loginReq.flush('Autenticación exitosa.', {
+      headers: {
+        'X-User-Role': 'ADMIN',
+        'X-Token-Expires-At': String(Date.now() + 3_600_000),
+      },
     });
 
     const meReq = httpMock.expectOne(`${environment.apiUrl}/api/v1/auth/me`);
     expect(meReq.request.method).toBe('GET');
+    expect(meReq.request.withCredentials).toBe(true);
     meReq.flush({
       id: 'usr_123',
       username: 'angel',
@@ -79,24 +83,56 @@ describe('AuthService & roleGuard (Roles & Security)', () => {
     expect(service.isAdmin()).toBe(true);
     expect(service.isClient()).toBe(false);
     expect(service.hasRole('ADMIN')).toBe(true);
-    expect(localStorage.getItem('auth_token')).toBe(fakeToken);
+    expect(localStorage.getItem('auth_token')).toBeNull();
     expect(localStorage.getItem('auth_role')).toBeNull();
   });
 
-  it('should ignore tampered auth_role in localStorage and rely on JWT/profile', () => {
-    localStorage.setItem('auth_role', 'ADMIN');
-    const clientToken = createFakeJwt({ sub: 'cliente1', role: 'CLIENT' });
-    service.saveToken(clientToken);
+  it('should validate existing HttpOnly cookie session on authGuard / guestGuard reload', async () => {
+    const authResult$ = TestBed.runInInjectionContext(() =>
+      authGuard({} as ActivatedRouteSnapshot, {} as RouterStateSnapshot)
+    ) as Observable<boolean | UrlTree>;
 
-    expect(service.currentRole()).toBe('CLIENT');
-    expect(service.isAdmin()).toBe(false);
-    expect(service.isClient()).toBe(true);
+    const authPromise = firstValueFrom(authResult$);
+    const meReq = httpMock.expectOne(`${environment.apiUrl}/api/v1/auth/me`);
+    expect(meReq.request.withCredentials).toBe(true);
+    meReq.flush({
+      id: 'usr_123',
+      username: 'angel',
+      email: 'angel@correo.com',
+      phone: '5512345678',
+      role: 'CLIENT',
+    });
+
+    expect(await authPromise).toBe(true);
+    expect(service.isAuthenticated()).toBe(true);
+
+    const guestResult = TestBed.runInInjectionContext(() =>
+      guestGuard({} as ActivatedRouteSnapshot, {} as RouterStateSnapshot)
+    ) as UrlTree;
+    expect(guestResult instanceof UrlTree).toBe(true);
+    expect(router.serializeUrl(guestResult)).toBe('/products');
   });
 
-  it('should verify role against /me in roleGuard and block CLIENT even if localStorage was modified', async () => {
-    localStorage.setItem('auth_role', 'ADMIN');
-    const clientToken = createFakeJwt({ sub: 'cliente1', role: 'CLIENT' });
-    service.saveToken(clientToken);
+  it('should block guest access in authGuard and allow /auth/login in guestGuard when unauthenticated', async () => {
+    const authResult$ = TestBed.runInInjectionContext(() =>
+      authGuard({} as ActivatedRouteSnapshot, {} as RouterStateSnapshot)
+    ) as Observable<boolean | UrlTree>;
+
+    const authPromise = firstValueFrom(authResult$);
+    const meReq = httpMock.expectOne(`${environment.apiUrl}/api/v1/auth/me`);
+    meReq.flush(
+      { code: 'UNAUTHORIZED', message: 'Token ausente' },
+      { status: 401, statusText: 'Unauthorized' }
+    );
+
+    const outcome = await authPromise;
+    expect(outcome instanceof UrlTree).toBe(true);
+    expect(router.serializeUrl(outcome as UrlTree)).toBe('/auth/login');
+    expect(service.isAuthenticated()).toBe(false);
+  });
+
+  it('should verify role against /me in roleGuard and block CLIENT from ADMIN routes', async () => {
+    service.setSessionMetadata('ADMIN');
 
     const guard = roleGuard('ADMIN');
     const result$ = TestBed.runInInjectionContext(() =>
@@ -107,6 +143,7 @@ describe('AuthService & roleGuard (Roles & Security)', () => {
     const resultPromise = firstValueFrom(result$);
 
     const meReq = httpMock.expectOne(`${environment.apiUrl}/api/v1/auth/me`);
+    expect(meReq.request.withCredentials).toBe(true);
     meReq.flush({
       id: 'usr_456',
       username: 'cliente1',
@@ -120,9 +157,8 @@ describe('AuthService & roleGuard (Roles & Security)', () => {
     expect(router.serializeUrl(outcome as UrlTree)).toBe('/products');
   });
 
-  it('should logout and redirect to /auth/login when /me returns 403 in roleGuard (tampered JWT)', async () => {
-    const forgedToken = createFakeJwt({ sub: 'cliente1', role: 'ADMIN' });
-    service.saveToken(forgedToken);
+  it('should clear session and redirect to /auth/login when /me returns 403 in roleGuard', async () => {
+    service.setSessionMetadata('ADMIN');
 
     const guard = roleGuard('ADMIN');
     const result$ = TestBed.runInInjectionContext(() =>
@@ -140,51 +176,29 @@ describe('AuthService & roleGuard (Roles & Security)', () => {
     expect(service.isAuthenticated()).toBe(false);
   });
 
-  it('should refresh token proactively when close to expiration via validateSession', () => {
-    const nowSec = Math.floor(Date.now() / 1000);
-    const expiringSoonToken = createFakeJwt({
-      sub: 'angel',
-      role: 'CLIENT',
-      iat: nowSec - 3500,
-      exp: nowSec + 60, // quedan 60s (< umbral de 5 min)
-    });
-    const refreshedToken = createFakeJwt({
-      sub: 'angel',
-      role: 'ADMIN',
-      iat: nowSec,
-      exp: nowSec + 3600,
-    });
-
-    service.saveToken(expiringSoonToken);
-    expect(service.shouldRefreshToken()).toBe(true);
+  it('should refresh HttpOnly cookie proactively when close to expiration via validateSession', () => {
+    service.setSessionMetadata('CLIENT', Date.now() + 60_000, Date.now() - 3_500_000);
 
     service.validateSession();
 
     const refreshReq = httpMock.expectOne(`${environment.apiUrl}/api/v1/auth/refresh`);
     expect(refreshReq.request.method).toBe('POST');
-    expect(refreshReq.request.headers.get('Authorization')).toBe(`Bearer ${expiringSoonToken}`);
+    expect(refreshReq.request.withCredentials).toBe(true);
+    expect(refreshReq.request.headers.has('Authorization')).toBe(false);
     refreshReq.flush({
-      token: refreshedToken,
+      token: null,
       role: 'ADMIN',
-      expiresAt: new Date((nowSec + 3600) * 1000).toISOString(),
+      expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
       refreshed: true,
     });
 
-    expect(service.getToken()).toBe(refreshedToken);
     expect(service.currentRole()).toBe('ADMIN');
-    expect(localStorage.getItem('auth_token')).toBe(refreshedToken);
     expect(service.isAuthenticated()).toBe(true);
+    expect(localStorage.getItem('auth_token')).toBeNull();
   });
 
-  it('should logout when validateSession receives 401 from /refresh for an expired token', () => {
-    const nowSec = Math.floor(Date.now() / 1000);
-    const expiredToken = createFakeJwt({
-      sub: 'angel',
-      role: 'CLIENT',
-      iat: nowSec - 3600,
-      exp: nowSec - 10,
-    });
-    service.saveToken(expiredToken);
+  it('should call /logout and clear session when validateSession receives 401 from /refresh', () => {
+    service.setSessionMetadata('CLIENT', Date.now() - 10_000);
 
     service.validateSession();
 
@@ -194,16 +208,18 @@ describe('AuthService & roleGuard (Roles & Security)', () => {
       { status: 401, statusText: 'Unauthorized' }
     );
 
+    const logoutReq = httpMock.expectOne(`${environment.apiUrl}/api/v1/auth/logout`);
+    expect(logoutReq.request.method).toBe('POST');
+    expect(logoutReq.request.withCredentials).toBe(true);
+    logoutReq.flush({ message: 'Sesión cerrada correctamente.' });
+
     expect(service.isAuthenticated()).toBe(false);
     expect(localStorage.getItem('auth_token')).toBeNull();
   });
 
-  it('should deduplicate /refresh on concurrent 401 responses and retry requests via authInterceptor', async () => {
+  it('should deduplicate /refresh on concurrent 401 responses and retry requests with withCredentials', async () => {
     const http = TestBed.inject(HttpClient);
-    const nowSec = Math.floor(Date.now() / 1000);
-    const oldToken = createFakeJwt({ sub: 'angel', role: 'CLIENT', iat: nowSec - 100, exp: nowSec + 300 });
-    const newToken = createFakeJwt({ sub: 'angel', role: 'CLIENT', iat: nowSec, exp: nowSec + 3600 });
-    service.saveToken(oldToken);
+    service.setSessionMetadata('CLIENT', Date.now() + 300_000);
 
     const combinedPromise = firstValueFrom(
       forkJoin([
@@ -214,25 +230,27 @@ describe('AuthService & roleGuard (Roles & Security)', () => {
 
     const req1 = httpMock.expectOne(`${environment.apiUrl}/api/v1/cart`);
     const req2 = httpMock.expectOne(`${environment.apiUrl}/api/v1/order`);
-    expect(req1.request.headers.get('Authorization')).toBe(`Bearer ${oldToken}`);
-    expect(req2.request.headers.get('Authorization')).toBe(`Bearer ${oldToken}`);
+    expect(req1.request.withCredentials).toBe(true);
+    expect(req2.request.withCredentials).toBe(true);
+    expect(req1.request.headers.has('Authorization')).toBe(false);
 
     req1.flush({ code: 'TOKEN_EXPIRED' }, { status: 401, statusText: 'Unauthorized' });
     req2.flush({ code: 'TOKEN_EXPIRED' }, { status: 401, statusText: 'Unauthorized' });
 
     const refreshReqs = httpMock.match(`${environment.apiUrl}/api/v1/auth/refresh`);
     expect(refreshReqs.length).toBe(1);
+    expect(refreshReqs[0].request.withCredentials).toBe(true);
     refreshReqs[0].flush({
-      token: newToken,
+      token: null,
       role: 'CLIENT',
-      expiresAt: new Date((nowSec + 3600) * 1000).toISOString(),
+      expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
       refreshed: true,
     });
 
     const retry1 = httpMock.expectOne(`${environment.apiUrl}/api/v1/cart`);
     const retry2 = httpMock.expectOne(`${environment.apiUrl}/api/v1/order`);
-    expect(retry1.request.headers.get('Authorization')).toBe(`Bearer ${newToken}`);
-    expect(retry2.request.headers.get('Authorization')).toBe(`Bearer ${newToken}`);
+    expect(retry1.request.withCredentials).toBe(true);
+    expect(retry2.request.withCredentials).toBe(true);
 
     retry1.flush({ ok: true });
     retry2.flush({ ok: true });
@@ -247,8 +265,7 @@ describe('AuthService & roleGuard (Roles & Security)', () => {
     const navigateSpy = vi.spyOn(router, 'navigate');
     const toastErrorSpy = vi.spyOn(toast, 'error');
     const toastWarningSpy = vi.spyOn(toast, 'warning');
-    const oldToken = createFakeJwt({ sub: 'angel', role: 'CLIENT' });
-    service.saveToken(oldToken);
+    service.setSessionMetadata('CLIENT', Date.now() + 300_000);
 
     let completedWithoutError = false;
     let receivedError = false;
@@ -268,6 +285,9 @@ describe('AuthService & roleGuard (Roles & Security)', () => {
     const refreshReq = httpMock.expectOne(`${environment.apiUrl}/api/v1/auth/refresh`);
     refreshReq.flush({ code: 'TOKEN_EXPIRED' }, { status: 401, statusText: 'Unauthorized' });
 
+    const logoutReq = httpMock.expectOne(`${environment.apiUrl}/api/v1/auth/logout`);
+    logoutReq.flush({ message: 'Sesión cerrada correctamente.' });
+
     await Promise.resolve();
 
     expect(receivedError).toBe(false);
@@ -280,8 +300,7 @@ describe('AuthService & roleGuard (Roles & Security)', () => {
   });
 
   it('should resolve default route by role and redirect ADMIN away from /products in roleGuard', async () => {
-    const adminToken = createFakeJwt({ sub: 'admin1', role: 'ADMIN' });
-    service.saveToken(adminToken);
+    service.setSessionMetadata('ADMIN');
 
     expect(service.getDefaultRoute()).toBe('/admin/products');
     expect(service.getDefaultRoute('CLIENT')).toBe('/products');
@@ -307,10 +326,8 @@ describe('AuthService & roleGuard (Roles & Security)', () => {
     expect(router.serializeUrl(outcome as UrlTree)).toBe('/admin/products');
   });
 
-  it('should update username via PUT /me/username, save refreshed token, and sync signals', () => {
-    const initialToken = createFakeJwt({ sub: 'user1', role: 'CLIENT' });
-    const nextToken = createFakeJwt({ sub: 'user1_new', role: 'CLIENT' });
-    service.saveToken(initialToken);
+  it('should update username via PUT /me/username with withCredentials and sync signals', () => {
+    service.setSessionMetadata('CLIENT');
 
     let capturedUsername = '';
     service.updateUsername('user1_new').subscribe((res) => {
@@ -319,10 +336,11 @@ describe('AuthService & roleGuard (Roles & Security)', () => {
 
     const req = httpMock.expectOne(`${environment.apiUrl}/api/v1/auth/me/username`);
     expect(req.request.method).toBe('PUT');
+    expect(req.request.withCredentials).toBe(true);
     expect(req.request.body).toEqual({ username: 'user1_new' });
 
     req.flush({
-      token: nextToken,
+      token: null,
       profile: {
         id: 'usr_1',
         username: 'user1_new',
@@ -333,12 +351,12 @@ describe('AuthService & roleGuard (Roles & Security)', () => {
     });
 
     expect(capturedUsername).toBe('user1_new');
-    expect(service.getToken()).toBe(nextToken);
     expect(service.currentUsername()).toBe('user1_new');
     expect(service.currentProfile()?.username).toBe('user1_new');
+    expect(localStorage.getItem('auth_token')).toBeNull();
   });
 
-  it('should update password via PUT /me/password', () => {
+  it('should update password via PUT /me/password with withCredentials', () => {
     let responseMessage = '';
     service
       .updatePassword({
@@ -351,6 +369,7 @@ describe('AuthService & roleGuard (Roles & Security)', () => {
 
     const req = httpMock.expectOne(`${environment.apiUrl}/api/v1/auth/me/password`);
     expect(req.request.method).toBe('PUT');
+    expect(req.request.withCredentials).toBe(true);
     expect(req.request.body).toEqual({
       currentPassword: 'oldPassword123',
       newPassword: 'newPassword456',
@@ -358,5 +377,22 @@ describe('AuthService & roleGuard (Roles & Security)', () => {
 
     req.flush({ message: 'Contraseña actualizada correctamente.' });
     expect(responseMessage).toBe('Contraseña actualizada correctamente.');
+  });
+
+  it('should clear session and wait for POST /logout before navigating to /auth/login', () => {
+    const navigateSpy = vi.spyOn(router, 'navigate');
+    service.setSessionMetadata('CLIENT', Date.now() + 300_000);
+
+    service.logout();
+
+    expect(service.isAuthenticated()).toBe(false);
+    expect(navigateSpy).not.toHaveBeenCalled();
+
+    const logoutReq = httpMock.expectOne(`${environment.apiUrl}/api/v1/auth/logout`);
+    expect(logoutReq.request.method).toBe('POST');
+    expect(logoutReq.request.withCredentials).toBe(true);
+    logoutReq.flush({ message: 'Sesión cerrada correctamente.' });
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/auth/login']);
   });
 });
